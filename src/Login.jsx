@@ -117,7 +117,7 @@ export default function Login() {
       <div style={s.card}>
         <div style={s.logoWrap}>
           <div style={s.badge}>Sistema Interno</div>
-          <div style={s.logoText}>NOVA <span style={s.logoAccent}>PARETO</span></div>
+          <div style={s.logoText}>MEGA <span style={s.logoAccent}>JEANS</span></div>
           <div style={s.logoSub}>Gestão de Estoque & Resultados</div>
         </div>
 
