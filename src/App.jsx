@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { supabase } from './supabase';
 
-
 // ==========================================
 // 1. CONFIGURAÇÕES FINANCEIRA DAS LOJAS
 // ==========================================
@@ -278,7 +277,8 @@ const CategoryDetailPanel = ({ category, items, onClose }) => {
 // ==========================================
 // 3. COMPONENTE PRINCIPAL
 // ==========================================
-const App = ({ userId, userEmail }) => {
+const App = () => {
+  // --- Estados de Interface ---
   const [activeTab, setActiveTab] = useState('audit'); 
   const [searchTerm, setSearchTerm] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
@@ -304,20 +304,22 @@ const App = ({ userId, userEmail }) => {
   const [importTargetStore, setImportTargetStore] = useState('10');
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
   
-  // --- Estados Persistentes ---
-
   // --- Estados Persistentes (Supabase) ---
-  const [systemData, setSystemDataState] = useState([]);
-  const [auditData, setAuditDataState] = useState([]);
+  const [systemData, setSystemData] = useState([]);
+  const [auditData, setAuditData] = useState([]);
   const [completedIds, setCompletedIds] = useState(new Set());
-  const [marketingStatus, setMarketingStatusState] = useState({});
-  const [salesHistory, setSalesHistoryState] = useState([]);
-  const [sellerOverrides, setSellerOverridesState] = useState({});
-  const [projectionSellers, setProjectionSellersState] = useState({});
-  const [dreValues, setDreValuesState] = useState({});
-  const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
-  const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
+  const [marketingStatus, setMarketingStatus] = useState({});
+  const [salesHistory, setSalesHistory] = useState([]);
+  const [sellerOverrides, setSellerOverrides] = useState({});
+  const [projectionSellers, setProjectionSellers] = useState({});
+  const [dreValues, setDreValues] = useState({});
   const [dbLoading, setDbLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
+  const [userStoreAccess, setUserStoreAccess] = useState([]);
+  // Goals tab: manual seller count override for quick scenario testing
+  const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
+  // Goals tab: selected seller names for chip-based count
+  const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
 
   // ── DB converters ──────────────────────────────────────────
   const dbToItem = (row) => ({
@@ -326,8 +328,9 @@ const App = ({ userId, userEmail }) => {
     COR1DESC: row.cor1desc, DATAENTRADA: row.dataentrada,
     sizes: row.sizes || {}, QTDE: row.qtde || 0,
   });
-  const itemToDb = (item) => ({
-    user_id: userId, item_id: item.id,
+  const itemToDb = (item, storeCode) => ({
+    store_code: storeCode || selectedStore,
+    item_id: item.id,
     marca: item.MARCA, marcadesc: item.MARCADESC, tipodesc: item.TIPODESC,
     referencia: item.REFERENCIA, cor1desc: item.COR1DESC, dataentrada: item.DATAENTRADA,
     sizes: item.sizes || {}, qtde: item.QTDE || 0,
@@ -339,7 +342,7 @@ const App = ({ userId, userEmail }) => {
     pa: row.pa, totalSales: row.total_sales, ticketAvg: row.ticket_avg, period: row.period,
   });
   const saleToDb = (sale) => ({
-    user_id: userId, store_code: sale.storeCode, seller_code: sale.sellerCode,
+    store_code: sale.storeCode, seller_code: sale.sellerCode,
     seller_name: sale.sellerName, days_worked: sale.daysWorked, sales_count: sale.salesCount,
     items_count: sale.itemsCount, pa: sale.pa, total_sales: sale.totalSales,
     ticket_avg: sale.ticketAvg, period: sale.period,
@@ -349,6 +352,18 @@ const App = ({ userId, userEmail }) => {
   const loadAllData = async () => {
     setDbLoading(true);
     try {
+      // Load user profile and store access
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      const { data: storeAccess } = await supabase.from('user_store_access').select('store_code').eq('user_id', user.id);
+      const role = profile?.role || 'manager_limited';
+      const stores = storeAccess?.map(r => r.store_code) || [];
+      setUserRole(role);
+      setUserStoreAccess(stores);
+      // Set default store to first accessible store if not owner
+      if (role !== 'owner' && stores.length > 0) setSelectedStore(stores[0]);
+
       await Promise.all([
         loadSystemData(), loadAuditData(), loadSalesHistory(),
         loadDreValues(), loadProjectionSellers(), loadMarketingStatus(),
@@ -356,46 +371,47 @@ const App = ({ userId, userEmail }) => {
       ]);
     } finally { setDbLoading(false); }
   };
+
   const loadSystemData = async () => {
-    const { data } = await supabase.from('system_data').select('*').eq('user_id', userId).order('item_id');
-    if (data) setSystemDataState(data.map(dbToItem));
+    const { data } = await supabase.from('system_data').select('*').order('item_id');
+    if (data) setSystemData(data.map(dbToItem));
   };
   const loadAuditData = async () => {
-    const { data } = await supabase.from('audit_data').select('*').eq('user_id', userId).order('item_id');
-    if (data) setAuditDataState(data.map(dbToItem));
+    const { data } = await supabase.from('audit_data').select('*').order('item_id');
+    if (data) setAuditData(data.map(dbToItem));
   };
   const loadSalesHistory = async () => {
-    const { data } = await supabase.from('sales_history').select('*').eq('user_id', userId);
-    if (data) setSalesHistoryState(data.map(dbToSale));
+    const { data } = await supabase.from('sales_history').select('*');
+    if (data) setSalesHistory(data.map(dbToSale));
   };
   const loadDreValues = async () => {
-    const { data } = await supabase.from('dre_values').select('*').eq('user_id', userId);
-    if (data) { const obj = {}; data.forEach(r => { obj[r.dre_key] = r.values; }); setDreValuesState(obj); }
+    const { data } = await supabase.from('dre_values').select('*');
+    if (data) { const obj = {}; data.forEach(r => { obj[r.dre_key] = r.values; }); setDreValues(obj); }
   };
   const loadProjectionSellers = async () => {
-    const { data } = await supabase.from('projection_sellers').select('*').eq('user_id', userId);
-    if (data) { const obj = {}; data.forEach(r => { obj[r.projection_key] = r.seller_count; }); setProjectionSellersState(obj); }
+    const { data } = await supabase.from('projection_sellers').select('*');
+    if (data) { const obj = {}; data.forEach(r => { obj[r.projection_key] = r.seller_count; }); setProjectionSellers(obj); }
   };
   const loadMarketingStatus = async () => {
-    const { data } = await supabase.from('marketing_status').select('*').eq('user_id', userId);
+    const { data } = await supabase.from('marketing_status').select('*');
     if (data) {
       const obj = {};
       data.forEach(r => { obj[r.item_key] = { photo: r.photo, catalog: r.catalog, posted: r.posted, discontinued: r.discontinued }; });
-      setMarketingStatusState(obj);
+      setMarketingStatus(obj);
     }
   };
   const loadCompletedIds = async () => {
-    const { data } = await supabase.from('completed_ids').select('item_id').eq('user_id', userId);
+    const { data } = await supabase.from('completed_ids').select('item_id');
     if (data) setCompletedIds(new Set(data.map(r => r.item_id)));
   };
   const loadSellerOverrides = async () => {
-    const { data } = await supabase.from('seller_overrides').select('*').eq('user_id', userId);
-    if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverridesState(obj); }
+    const { data } = await supabase.from('seller_overrides').select('*');
+    if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); }
   };
 
-  useEffect(() => { if (userId) loadAllData(); }, [userId]);
+  useEffect(() => { loadAllData(); }, []);
 
-  // Limpar meses futuros (só estado, sem gravar)
+  // Limpar dados de meses futuros (só estado)
   useEffect(() => {
     if (salesHistory.length === 0) return;
     const now = new Date();
@@ -404,7 +420,7 @@ const App = ({ userId, userEmail }) => {
       const [y, m] = h.period.split('-').map(Number);
       return y < cy || (y === cy && m <= cm);
     });
-    if (cleaned.length !== salesHistory.length) setSalesHistoryState(cleaned);
+    if (cleaned.length !== salesHistory.length) setSalesHistory(cleaned);
   }, [salesHistory.length]);
 
   // --- Lógica de Negócio ---
@@ -418,6 +434,23 @@ const App = ({ userId, userEmail }) => {
       (item.COR1DESC || "").toLowerCase().includes(t)
     );
   }, [searchTerm]);
+
+  const getSellerStatus = (storeId, month, year, sellerName, daysWorked) => {
+      const key = `${storeId}-${month}-${year}-${sellerName}`;
+      if (sellerOverrides[key]) return sellerOverrides[key];
+      if (daysWorked >= 5 && !sellerName.toUpperCase().includes('EXTRA')) return 'active';
+      return 'extra';
+  };
+
+  const toggleSellerStatus = async (storeId, month, year, sellerName, currentStatus) => {
+      const key = `${storeId}-${month}-${year}-${sellerName}`;
+      const newStatus = currentStatus === 'active' ? 'extra' : 'active';
+      setSellerOverrides(prev => ({ ...prev, [key]: newStatus }));
+      await supabase.from('seller_overrides').upsert(
+        { store_code: storeId, override_key: key, status: newStatus, updated_at: new Date().toISOString() },
+        { onConflict: 'store_code,override_key' }
+      );
+  };
 
   const getHistoricalDataForStorePeriod = (storeId, month, year) => {
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -653,70 +686,49 @@ const App = ({ userId, userEmail }) => {
 
   const heavyStockToDisplay = printMode ? dashboardStats.heavyStock : dashboardStats.heavyStock.slice(0, 20);
 
-  const getSellerStatus = (storeId, month, year, sellerName, daysWorked) => {
-    const key = `${storeId}-${month}-${year}-${sellerName}`;
-    if (sellerOverrides[key]) return sellerOverrides[key];
-    if (daysWorked >= 5 && !sellerName.toUpperCase().includes('EXTRA')) return 'active';
-    return 'extra';
-  };
-
-  const toggleSellerStatus = async (storeId, month, year, sellerName, currentStatus) => {
-    const key = `${storeId}-${month}-${year}-${sellerName}`;
-    const newStatus = currentStatus === 'active' ? 'extra' : 'active';
-    setSellerOverridesState(prev => ({ ...prev, [key]: newStatus }));
-    await supabase.from('seller_overrides').upsert(
-      { user_id: userId, override_key: key, status: newStatus, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,override_key' }
-    );
-  };
-
-  // ── Handlers (Supabase) ────────────────────────────────────
+  // --- Handlers ---
   const handleAuditChange = useCallback((id, size, value) => {
     const newValue = value === "" ? 0 : (parseInt(value) || 0);
-    setAuditDataState(prev => prev.map(item => {
+    setAuditData(prev => prev.map(item => {
       if (item.id !== id) return item;
       const newSizes = { ...item.sizes, [size]: newValue };
       const newQtde = calculateTotal(newSizes);
       supabase.from('audit_data')
         .update({ sizes: newSizes, qtde: newQtde, updated_at: new Date().toISOString() })
-        .eq('user_id', userId).eq('item_id', id);
+        .eq('store_code', selectedStore).eq('item_id', id);
       return { ...item, sizes: newSizes, QTDE: newQtde };
     }));
-  }, [userId]);
+  }, [selectedStore]);
 
   const confirmFillAuditWithSystem = async () => {
     const filled = systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) }));
-    setAuditDataState(filled);
+    setAuditData(filled);
     setShowResetModal(false);
-    await supabase.from('audit_data').delete().eq('user_id', userId);
-    if (filled.length > 0) await supabase.from('audit_data').insert(filled.map(itemToDb));
+    await supabase.from('audit_data').delete().eq('store_code', selectedStore);
+    if (filled.length > 0) await supabase.from('audit_data').insert(filled.map(i => itemToDb(i, selectedStore)));
   };
 
   const toggleCompleted = async (itemId) => {
     const newSet = new Set(completedIds);
     if (newSet.has(itemId)) {
       newSet.delete(itemId);
-      await supabase.from('completed_ids').delete().eq('user_id', userId).eq('item_id', itemId);
+      await supabase.from('completed_ids').delete().eq('store_code', selectedStore).eq('item_id', itemId);
     } else {
       newSet.add(itemId);
-      await supabase.from('completed_ids').insert({ user_id: userId, item_id: itemId });
+      await supabase.from('completed_ids').insert({ store_code: selectedStore, item_id: itemId });
     }
     setCompletedIds(newSet);
   };
 
-  const toggleCategory = (category) => {
-    const newSet = new Set(expandedCategories);
-    newSet.has(category) ? newSet.delete(category) : newSet.add(category);
-    setExpandedCategories(newSet);
-  };
+  const toggleCategory = (category) => { const newSet = new Set(expandedCategories); newSet.has(category) ? newSet.delete(category) : newSet.add(category); setExpandedCategories(newSet); };
 
   const toggleMarketing = async (key, field) => {
     const current = marketingStatus[key] || {};
     const updated = { ...current, [field]: !current[field] };
-    setMarketingStatusState(prev => ({ ...prev, [key]: updated }));
+    setMarketingStatus(prev => ({ ...prev, [key]: updated }));
     await supabase.from('marketing_status').upsert(
-      { user_id: userId, item_key: key, photo: updated.photo||false, catalog: updated.catalog||false, posted: updated.posted||false, discontinued: updated.discontinued||false, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,item_key' }
+      { store_code: selectedStore, item_key: key, photo: updated.photo||false, catalog: updated.catalog||false, posted: updated.posted||false, discontinued: updated.discontinued||false, updated_at: new Date().toISOString() },
+      { onConflict: 'store_code,item_key' }
     );
   };
 
@@ -734,14 +746,14 @@ const App = ({ userId, userEmail }) => {
         item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || "GENERICO"; item.TIPODESC = item.TIPODESC || "OUTROS";
         return item;
       });
-      await supabase.from('system_data').delete().eq('user_id', userId);
-      if (parsed.length > 0) await supabase.from('system_data').insert(parsed.map(itemToDb));
-      setSystemDataState(parsed);
+      await supabase.from('system_data').delete().eq('store_code', importTargetStore);
+      if (parsed.length > 0) await supabase.from('system_data').insert(parsed.map(i => itemToDb(i, importTargetStore)));
+      setSystemData(parsed);
       const zeroed = parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return { ...i, sizes: z, QTDE: 0 }; });
-      await supabase.from('audit_data').delete().eq('user_id', userId);
-      if (zeroed.length > 0) await supabase.from('audit_data').insert(zeroed.map(itemToDb));
-      setAuditDataState(zeroed);
-      await supabase.from('completed_ids').delete().eq('user_id', userId);
+      await supabase.from('audit_data').delete().eq('store_code', importTargetStore);
+      if (zeroed.length > 0) await supabase.from('audit_data').insert(zeroed.map(i => itemToDb(i, importTargetStore)));
+      setAuditData(zeroed);
+      await supabase.from('completed_ids').delete().eq('store_code', importTargetStore);
       setCompletedIds(new Set());
       setShowImportModal(false); setImportText(""); alert("Importado com sucesso!");
     } catch(e) { console.error(e); alert("Erro na importação"); }
@@ -758,15 +770,17 @@ const App = ({ userId, userEmail }) => {
       const newEntries = rows.map(row => {
         const cols = row.split('\t');
         if (cols.length < 5 || isNaN(parseInt(cols[0]))) return null;
-        return { storeCode: importTargetStore, sellerCode: cols[1]?.trim(), sellerName: cols[2]?.trim(),
+        return {
+          storeCode: importTargetStore, sellerCode: cols[1]?.trim(), sellerName: cols[2]?.trim(),
           daysWorked: parseInt(cols[3])||0, salesCount: parseInt(cols[4])||0, itemsCount: parseInt(cols[6])||0,
           pa: parseFloat(cols[8]?.replace(',','.'))||0, totalSales: parseCurrency(cols[10]),
-          ticketAvg: parseCurrency(cols[12]), period };
+          ticketAvg: parseCurrency(cols[12]), period
+        };
       }).filter(Boolean);
-      await supabase.from('sales_history').delete().eq('user_id', userId).eq('store_code', importTargetStore).eq('period', period);
+      await supabase.from('sales_history').delete().eq('store_code', importTargetStore).eq('period', period);
       const base = salesHistory.filter(h => !(h.period === period && h.storeCode === importTargetStore));
       if (newEntries.length > 0) await supabase.from('sales_history').insert(newEntries.map(saleToDb));
-      setSalesHistoryState([...base, ...newEntries]);
+      setSalesHistory([...base, ...newEntries]);
       setShowHistoryImportModal(false); setHistoryImportText(""); setClearBeforeImport(false);
       alert("Histórico importado com sucesso!");
     } catch(e) { console.error(e); alert("Erro na importação do histórico"); }
@@ -798,7 +812,6 @@ const App = ({ userId, userEmail }) => {
       return 0;
     });
   }, [auditData, searchTerm, marketingStatus, marketingSort]);
-
 
   // --- RENDERIZAÇÃO COMPONENTES ---
   const GroupedDifferenceTable = ({ items, title, icon: Icon, colorClass, bgClass, isExit }) => {
@@ -848,10 +861,10 @@ const App = ({ userId, userEmail }) => {
     const savedDre = dreValues[dreKey] || {};
     const updateDreValue = (field, value) => {
       const updatedDre = { ...(dreValues[dreKey] || {}), [field]: parseFloat(value) || 0 };
-      setDreValuesState(prev => ({ ...prev, [dreKey]: updatedDre }));
+      setDreValues(prev => ({ ...prev, [dreKey]: updatedDre }));
       supabase.from('dre_values').upsert(
-        { user_id: userId, dre_key: dreKey, values: updatedDre, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,dre_key' }
+        { store_code: selectedStore, dre_key: dreKey, values: updatedDre, updated_at: new Date().toISOString() },
+        { onConflict: 'store_code,dre_key' }
       );
     };
     const receitaBruta = totalSalesMonth;
@@ -1810,7 +1823,7 @@ const App = ({ userId, userEmail }) => {
                                     <td className="p-3 text-right text-gray-600 font-mono">{sales2024 > 0 ? formatCurrency(sales2024) : '-'}</td>
                                     <td className="p-3 text-right text-gray-600 font-mono">{sales2025 > 0 ? formatCurrency(sales2025) : '-'}</td>
                                     <td className="p-3 text-right text-green-700 font-mono font-bold">{sales2026 > 0 ? formatCurrency(sales2026) : '-'}</td>
-                                    <td className="p-3 text-center"><input type="number" className="w-14 border border-indigo-200 text-center rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={currentSellers} onClick={e => e.stopPropagation()} onChange={(e) => { const k=`${selectedStore}-${m}`,v=parseInt(e.target.value)||1; setProjectionSellersState(prev=>({...prev,[k]:v})); supabase.from('projection_sellers').upsert({user_id:userId,projection_key:k,seller_count:v,updated_at:new Date().toISOString()},{onConflict:'user_id,projection_key'}); }}/></td>
+                                    <td className="p-3 text-center"><input type="number" className="w-14 border border-indigo-200 text-center rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={currentSellers} onClick={e => e.stopPropagation()} onChange={(e) => { const k=`${selectedStore}-${m}`,v=parseInt(e.target.value)||1; setProjectionSellers(prev=>({...prev,[k]:v})); supabase.from('projection_sellers').upsert({store_code:selectedStore,projection_key:k,seller_count:v,updated_at:new Date().toISOString()},{onConflict:'store_code,projection_key'}); }}/></td>
                                 </tr>
                                 {isExpanded && (
                                   <tr key={`${m}-detail`}>
@@ -2208,7 +2221,7 @@ const App = ({ userId, userEmail }) => {
             <button onClick={() => setActiveTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 6. DRE</button>
             <button onClick={() => setActiveTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 7. Metas</button>
             <div className="ml-auto flex items-center px-4 gap-2">
-              <span className="text-xs text-gray-400 hidden md:block">{userEmail}</span>
+              {userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}
               <button onClick={() => supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button>
             </div>
           </div>
@@ -2573,6 +2586,5 @@ const App = ({ userId, userEmail }) => {
     </div>
   );
 };
-
 
 export default App;

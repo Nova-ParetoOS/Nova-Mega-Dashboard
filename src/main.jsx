@@ -1,38 +1,40 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import { supabase } from './supabase'
 import App from './App.jsx'
 import Login from './Login.jsx'
+import { supabase } from './supabase.js'
 import './index.css'
 
 function Root() {
-  const [session, setSession] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const [session, setSession] = useState(undefined) // undefined = loading
 
   useEffect(() => {
-    // Checa sessão existente ao carregar
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      setChecking(false)
     })
-    // Escuta mudanças de login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
     return () => subscription.unsubscribe()
   }, [])
 
-  if (checking) {
+  if (session === undefined) {
     return (
-      <div className="min-h-screen bg-indigo-950 flex items-center justify-center">
-        <div className="text-white text-lg font-bold animate-pulse">Carregando...</div>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px', fontWeight: 'bold' }}>
+          Carregando...
+        </div>
       </div>
     )
   }
 
   if (!session) return <Login />
 
-  return <App userId={session.user.id} userEmail={session.user.email} />
+  return <App />
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
