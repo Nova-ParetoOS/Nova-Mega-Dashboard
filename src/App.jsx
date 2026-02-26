@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal, Briefcase, Phone, Clock, Star, AlertCircle, MessageCircle } from 'lucide-react';
 import { supabase } from './supabase';
 
 // ==========================================
@@ -279,7 +279,8 @@ const CategoryDetailPanel = ({ category, items, onClose }) => {
 // ==========================================
 const App = () => {
   // --- Estados de Interface ---
-  const [activeTab, setActiveTab] = useState('audit'); 
+  const [activeTab, setActiveTab] = useState(() => { const p = new URLSearchParams(window.location.search); const t = p.get('tab'); return ['system','audit','diff','dashboard','marketing','viability','goals','hr'].includes(t) ? t : 'audit'; });
+  const navigateTab = (tab) => { setActiveTab(tab); const u = new URL(window.location); u.searchParams.set('tab', tab); window.history.replaceState({}, '', u); };
   const [searchTerm, setSearchTerm] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showHistoryImportModal, setShowHistoryImportModal] = useState(false);
@@ -311,6 +312,12 @@ const App = () => {
   const [marketingStatus, setMarketingStatus] = useState({});
   const [salesHistory, setSalesHistory] = useState([]);
   const [sellerOverrides, setSellerOverrides] = useState({});
+  const [hrCandidates, setHrCandidates] = useState([]);
+  const [hrFilter, setHrFilter] = useState('all');
+  const [hrSearch, setHrSearch] = useState('');
+  const [hrExpanded, setHrExpanded] = useState(new Set());
+  const [hrImportText, setHrImportText] = useState('');
+  const [showHrImportModal, setShowHrImportModal] = useState(false);
   const [projectionSellers, setProjectionSellers] = useState({});
   const [dreValues, setDreValues] = useState({});
   const [dbLoading, setDbLoading] = useState(true);
@@ -367,7 +374,7 @@ const App = () => {
       await Promise.all([
         loadSystemData(), loadAuditData(), loadSalesHistory(),
         loadDreValues(), loadProjectionSellers(), loadMarketingStatus(),
-        loadCompletedIds(), loadSellerOverrides(),
+        loadCompletedIds(), loadSellerOverrides(), loadHrCandidates(),
       ]);
     } finally { setDbLoading(false); }
   };
@@ -407,6 +414,10 @@ const App = () => {
   const loadSellerOverrides = async () => {
     const { data } = await supabase.from('seller_overrides').select('*');
     if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); }
+  };
+  const loadHrCandidates = async () => {
+    const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false });
+    if (data) setHrCandidates(data);
   };
 
   useEffect(() => { loadAllData(); }, []);
@@ -2213,13 +2224,14 @@ const App = () => {
       {!printMode && (
         <nav className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm no-print overflow-x-auto">
           <div className="max-w-7xl mx-auto flex px-4">
-            <button onClick={() => setActiveTab('system')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'system' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Package className="w-4 h-4 inline mr-1"/> 1. Sistema</button>
-            <button onClick={() => setActiveTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'audit' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><CheckCircle className="w-4 h-4 inline mr-1"/> 2. Contagem</button>
-            <button onClick={() => setActiveTab('diff')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'diff' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><AlertTriangle className="w-4 h-4 inline mr-1"/> 3. Divergências</button>
-            <button onClick={() => setActiveTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 4. Dashboard</button>
-            <button onClick={() => setActiveTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 5. Divulgação</button>
-            <button onClick={() => setActiveTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 6. DRE</button>
-            <button onClick={() => setActiveTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 7. Metas</button>
+            <button onClick={() => navigateTab('system')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'system' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Package className="w-4 h-4 inline mr-1"/> 1. Sistema</button>
+            <button onClick={() => navigateTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'audit' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><CheckCircle className="w-4 h-4 inline mr-1"/> 2. Contagem</button>
+            <button onClick={() => navigateTab('diff')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'diff' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><AlertTriangle className="w-4 h-4 inline mr-1"/> 3. Divergências</button>
+            <button onClick={() => navigateTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 4. Dashboard</button>
+            <button onClick={() => navigateTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 5. Divulgação</button>
+            <button onClick={() => navigateTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 6. DRE</button>
+            <button onClick={() => navigateTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 7. Metas</button>
+            <button onClick={() => navigateTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'hr' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Briefcase className="w-4 h-4 inline mr-1"/> 8. RH</button>
             <div className="ml-auto flex items-center px-4 gap-2">
               {userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}
               <button onClick={() => supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button>
@@ -2581,10 +2593,258 @@ const App = () => {
 
         {activeTab === 'viability' && renderViabilityTab()}
         {activeTab === 'goals' && renderGoalsTab()}
+        {activeTab === 'hr' && renderHrTab()}
 
       </main>
     </div>
   );
 };
+
+  // ── RH TAB ────────────────────────────────────────────────
+
+  const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
+
+  const STATUS_COLORS = {
+    'Banco de Talentos':          { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
+    'Recusado':                   { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
+    'Contratado':                 { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
+    'Em análise':                 { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+    'Entrevista agendada':        { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
+    'Entrevista realizada':       { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+    'Aguardando retorno':         { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+  };
+
+  const processHrImport = async () => {
+    const lines = hrImportText.trim().split('\n').filter(Boolean);
+    if (lines.length === 0) { alert('Cole os dados antes de processar'); return; }
+    const entries = lines.map(line => {
+      const c = line.split('\t');
+      return {
+        store_code: selectedStore,
+        candidato:           c[0]?.trim() || '',
+        telefone:            c[1]?.trim() || null,
+        recebimento_curriculo: c[2]?.trim() || null,
+        data_resposta:       c[3]?.trim() || null,
+        status_processo:     c[4]?.trim() || null,
+        motivo_detalhes:     c[5]?.trim() || null,
+        entrevista_agendada: c[6]?.trim() || null,
+        nota_interna:        c[9]?.trim() || null,
+        fonte_captacao:      c[10]?.trim() || null,
+        observacoes:         c[11]?.trim() || null,
+        retornou:            c[12]?.trim()?.toUpperCase() === 'TRUE',
+        interessado:         c[13]?.trim()?.toUpperCase() === 'TRUE',
+        recusa:              c[14]?.trim()?.toUpperCase() === 'TRUE',
+        desvio:              c[15]?.trim()?.toUpperCase() === 'TRUE',
+        responsavel:         c[16]?.trim() || null,
+        whatsapp:            c[17]?.trim() || null,
+        etapa_maxima:        c[20]?.trim() || null,
+        macro_status_final:  c[21]?.trim() || null,
+        gargalo:             c[22]?.trim() || null,
+      };
+    }).filter(e => e.candidato);
+    if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
+    const { error } = await supabase.from('hr_candidates').insert(entries);
+    if (error) { alert('Erro ao importar: ' + error.message); return; }
+    await loadHrCandidates();
+    setShowHrImportModal(false);
+    setHrImportText('');
+    alert(entries.length + ' candidato(s) importado(s) com sucesso!');
+  };
+
+  const renderHrTab = () => {
+    const STATUSES = ['all', 'Banco de Talentos', 'Em análise', 'Entrevista agendada', 'Entrevista realizada', 'Contratado', 'Recusado', 'Aguardando retorno'];
+    const filtered = hrCandidates.filter(c => {
+      const matchFilter = hrFilter === 'all' || c.status_processo === hrFilter;
+      const matchSearch = !hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch);
+      return matchFilter && matchSearch;
+    });
+
+    const stats = {
+      total: hrCandidates.length,
+      interessados: hrCandidates.filter(c => c.interessado).length,
+      entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length,
+      contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length,
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div>
+              <div>
+                <h2 className="font-bold text-gray-800 text-lg">Recrutamento & Seleção</h2>
+                <p className="text-xs text-gray-500">Gestão de candidatos e processos seletivos</p>
+              </div>
+            </div>
+            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors">
+              <Upload className="w-4 h-4"/> Importar Candidatos
+            </button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            {[
+              { label: 'Total', value: stats.total, color: 'text-gray-700', bg: 'bg-gray-50' },
+              { label: 'Interessados', value: stats.interessados, color: 'text-blue-700', bg: 'bg-blue-50' },
+              { label: 'Entrevistas', value: stats.entrevistas, color: 'text-purple-700', bg: 'bg-purple-50' },
+              { label: 'Contratados', value: stats.contratados, color: 'text-green-700', bg: 'bg-green-50' },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-48">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/>
+              <input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato ou telefone..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {STATUSES.map(s => (
+                <button key={s} onClick={() => setHrFilter(s)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>
+                  {s === 'all' ? 'Todos' : s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Candidate List */}
+        <div className="space-y-2">
+          {filtered.length === 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+              <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/>
+              <p className="text-gray-500 font-medium">Nenhum candidato encontrado</p>
+              <p className="text-gray-400 text-sm mt-1">Importe candidatos usando o botão acima</p>
+            </div>
+          )}
+          {filtered.map(c => {
+            const isOpen = hrExpanded.has(c.id);
+            const sc = STATUS_COLORS[c.status_processo] || STATUS_COLORS['Banco de Talentos'];
+            const toggleExpand = () => {
+              const ns = new Set(hrExpanded);
+              ns.has(c.id) ? ns.delete(c.id) : ns.add(c.id);
+              setHrExpanded(ns);
+            };
+            return (
+              <div key={c.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* Row header */}
+                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleExpand}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-gray-800">{c.candidato}</span>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{c.status_processo || '—'}</span>
+                      {c.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">✓ Interessado</span>}
+                      {c.macro_status_final && <span className="text-xs text-gray-400 hidden md:block">{c.macro_status_final}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+                      {c.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{c.telefone}</span>}
+                      {c.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Currículo: {formatDateBR(c.recebimento_curriculo)}</span>}
+                      {c.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(c.entrevista_agendada)}</span>}
+                      {c.fonte_captacao && <span className="text-gray-400">{c.fonte_captacao}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {c.gargalo && c.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500" title={c.gargalo}/>}
+                    {c.whatsapp && (
+                      <a href={`https://wa.me/${c.whatsapp?.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200 transition-colors">
+                        <MessageCircle className="w-3.5 h-3.5"/> WA
+                      </a>
+                    )}
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
+                  </div>
+                </div>
+
+                {/* Expanded details */}
+                {isOpen && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: 'Data de Resposta',    value: formatDateBR(c.data_resposta) },
+                        { label: 'Entrevista',          value: formatDateBR(c.entrevista_agendada) },
+                        { label: 'Responsável',         value: c.responsavel },
+                        { label: 'Etapa Máxima',        value: c.etapa_maxima },
+                        { label: 'Macro Status',        value: c.macro_status_final },
+                        { label: 'Gargalo',             value: c.gargalo },
+                        { label: 'Fonte Captação',      value: c.fonte_captacao },
+                        { label: 'Nota Interna',        value: c.nota_interna },
+                      ].map(f => f.value && f.value !== '—' ? (
+                        <div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100">
+                          <div className="text-xs text-gray-400 mb-0.5">{f.label}</div>
+                          <div className="text-sm font-medium text-gray-700">{f.value}</div>
+                        </div>
+                      ) : null)}
+                    </div>
+
+                    {/* Flags */}
+                    <div className="flex flex-wrap gap-2">
+                      {c.retornou   && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
+                      {c.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">✓ Interessado</span>}
+                      {c.recusa     && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
+                      {c.desvio     && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
+                    </div>
+
+                    {/* Motivo / Observações */}
+                    {c.motivo_detalhes && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-100">
+                        <div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.motivo_detalhes}</p>
+                      </div>
+                    )}
+                    {c.observacoes && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-100">
+                        <div className="text-xs text-gray-400 mb-1">📝 Observações</div>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.observacoes}</p>
+                      </div>
+                    )}
+                    {c.gargalo && c.gargalo !== 'Fluxo ok' && (
+                      <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                        <div className="text-xs text-orange-500 mb-1">⚠️ Gargalo identificado</div>
+                        <p className="text-sm text-orange-700 font-medium">{c.gargalo}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Import Modal */}
+        {showHrImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+              <div className="p-5 border-b flex items-center justify-between">
+                <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3>
+                <button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200">
+                  <strong>Formato:</strong> Cole diretamente do Excel/Sheets. Colunas na ordem: Candidato, Telefone, Recebimento currículo, Data resposta, Status, Motivo, Entrevista agendada, Dias resp., Dias entrevista, Horas, Status entrevista, Data teste, Nota, Fonte, Observações, Alerta, Retornou, Interessados, Recusas, Desvios, Responsável, WhatsApp, Última atualização data, hora, Etapa Máxima, Macro Status, Gargalo
+                </div>
+                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)}
+                  placeholder="Cole aqui os dados copiados do Excel..." rows={10}
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
+              </div>
+              <div className="p-5 border-t flex justify-end gap-3">
+                <button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button>
+                <button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
 export default App;
