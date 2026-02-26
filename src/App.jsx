@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal, Briefcase, Phone, Clock, Star, AlertCircle, MessageCircle } from 'lucide-react';
 import { supabase } from './supabase';
+import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal, Briefcase, Phone, Clock, AlertCircle, MessageCircle } from 'lucide-react';
 
 // ==========================================
 // 1. CONFIGURAÇÕES FINANCEIRA DAS LOJAS
@@ -312,125 +312,57 @@ const App = () => {
   const [marketingStatus, setMarketingStatus] = useState({});
   const [salesHistory, setSalesHistory] = useState([]);
   const [sellerOverrides, setSellerOverrides] = useState({});
+  const [projectionSellers, setProjectionSellers] = useState({});
+  const [dreValues, setDreValues] = useState({});
+  const [dbLoading, setDbLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
+  const [userStoreAccess, setUserStoreAccess] = useState([]);
   const [hrCandidates, setHrCandidates] = useState([]);
   const [hrFilter, setHrFilter] = useState('all');
   const [hrSearch, setHrSearch] = useState('');
   const [hrExpanded, setHrExpanded] = useState(new Set());
   const [hrImportText, setHrImportText] = useState('');
   const [showHrImportModal, setShowHrImportModal] = useState(false);
-  const [projectionSellers, setProjectionSellers] = useState({});
-  const [dreValues, setDreValues] = useState({});
-  const [dbLoading, setDbLoading] = useState(true);
-  const [userRole, setUserRole] = useState(null);
-  const [userStoreAccess, setUserStoreAccess] = useState([]);
   // Goals tab: manual seller count override for quick scenario testing
   const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
   // Goals tab: selected seller names for chip-based count
   const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
 
-  // ── DB converters ──────────────────────────────────────────
-  const dbToItem = (row) => ({
-    id: row.item_id, MARCA: row.marca, MARCADESC: row.marcadesc,
-    TIPODESC: row.tipodesc, REFERENCIA: row.referencia,
-    COR1DESC: row.cor1desc, DATAENTRADA: row.dataentrada,
-    sizes: row.sizes || {}, QTDE: row.qtde || 0,
-  });
-  const itemToDb = (item, storeCode) => ({
-    store_code: storeCode || selectedStore,
-    item_id: item.id,
-    marca: item.MARCA, marcadesc: item.MARCADESC, tipodesc: item.TIPODESC,
-    referencia: item.REFERENCIA, cor1desc: item.COR1DESC, dataentrada: item.DATAENTRADA,
-    sizes: item.sizes || {}, qtde: item.QTDE || 0,
-    updated_at: new Date().toISOString(),
-  });
-  const dbToSale = (row) => ({
-    storeCode: row.store_code, sellerCode: row.seller_code, sellerName: row.seller_name,
-    daysWorked: row.days_worked, salesCount: row.sales_count, itemsCount: row.items_count,
-    pa: row.pa, totalSales: row.total_sales, ticketAvg: row.ticket_avg, period: row.period,
-  });
-  const saleToDb = (sale) => ({
-    store_code: sale.storeCode, seller_code: sale.sellerCode,
-    seller_name: sale.sellerName, days_worked: sale.daysWorked, sales_count: sale.salesCount,
-    items_count: sale.itemsCount, pa: sale.pa, total_sales: sale.totalSales,
-    ticket_avg: sale.ticketAvg, period: sale.period,
-  });
+  const dbToItem = (r) => ({ id: r.item_id, MARCA: r.marca, MARCADESC: r.marcadesc, TIPODESC: r.tipodesc, REFERENCIA: r.referencia, COR1DESC: r.cor1desc, DATAENTRADA: r.dataentrada, sizes: r.sizes || {}, QTDE: r.qtde || 0 });
+  const itemToDb = (item, sc) => ({ store_code: sc || selectedStore, item_id: item.id, marca: item.MARCA, marcadesc: item.MARCADESC, tipodesc: item.TIPODESC, referencia: item.REFERENCIA, cor1desc: item.COR1DESC, dataentrada: item.DATAENTRADA, sizes: item.sizes || {}, qtde: item.QTDE || 0, updated_at: new Date().toISOString() });
+  const dbToSale = (r) => ({ storeCode: r.store_code, sellerCode: r.seller_code, sellerName: r.seller_name, daysWorked: r.days_worked, salesCount: r.sales_count, itemsCount: r.items_count, pa: r.pa, totalSales: r.total_sales, ticketAvg: r.ticket_avg, period: r.period });
+  const saleToDb = (s) => ({ store_code: s.storeCode, seller_code: s.sellerCode, seller_name: s.sellerName, days_worked: s.daysWorked, sales_count: s.salesCount, items_count: s.itemsCount, pa: s.pa, total_sales: s.totalSales, ticket_avg: s.ticketAvg, period: s.period });
 
-  // ── Loaders ────────────────────────────────────────────────
   const loadAllData = async () => {
     setDbLoading(true);
     try {
-      // Load user profile and store access
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
       const { data: storeAccess } = await supabase.from('user_store_access').select('store_code').eq('user_id', user.id);
       const role = profile?.role || 'manager_limited';
       const stores = storeAccess?.map(r => r.store_code) || [];
-      setUserRole(role);
-      setUserStoreAccess(stores);
-      // Set default store to first accessible store if not owner
+      setUserRole(role); setUserStoreAccess(stores);
       if (role !== 'owner' && stores.length > 0) setSelectedStore(stores[0]);
-
-      await Promise.all([
-        loadSystemData(), loadAuditData(), loadSalesHistory(),
-        loadDreValues(), loadProjectionSellers(), loadMarketingStatus(),
-        loadCompletedIds(), loadSellerOverrides(), loadHrCandidates(),
-      ]);
+      await Promise.all([loadSystemData(), loadAuditData(), loadSalesHistory(), loadDreValues(), loadProjectionSellers(), loadMarketingStatus(), loadCompletedIds(), loadSellerOverrides(), loadHrCandidates()]);
     } finally { setDbLoading(false); }
   };
-
-  const loadSystemData = async () => {
-    const { data } = await supabase.from('system_data').select('*').order('item_id');
-    if (data) setSystemData(data.map(dbToItem));
-  };
-  const loadAuditData = async () => {
-    const { data } = await supabase.from('audit_data').select('*').order('item_id');
-    if (data) setAuditData(data.map(dbToItem));
-  };
-  const loadSalesHistory = async () => {
-    const { data } = await supabase.from('sales_history').select('*');
-    if (data) setSalesHistory(data.map(dbToSale));
-  };
-  const loadDreValues = async () => {
-    const { data } = await supabase.from('dre_values').select('*');
-    if (data) { const obj = {}; data.forEach(r => { obj[r.dre_key] = r.values; }); setDreValues(obj); }
-  };
-  const loadProjectionSellers = async () => {
-    const { data } = await supabase.from('projection_sellers').select('*');
-    if (data) { const obj = {}; data.forEach(r => { obj[r.projection_key] = r.seller_count; }); setProjectionSellers(obj); }
-  };
-  const loadMarketingStatus = async () => {
-    const { data } = await supabase.from('marketing_status').select('*');
-    if (data) {
-      const obj = {};
-      data.forEach(r => { obj[r.item_key] = { photo: r.photo, catalog: r.catalog, posted: r.posted, discontinued: r.discontinued }; });
-      setMarketingStatus(obj);
-    }
-  };
-  const loadCompletedIds = async () => {
-    const { data } = await supabase.from('completed_ids').select('item_id');
-    if (data) setCompletedIds(new Set(data.map(r => r.item_id)));
-  };
-  const loadSellerOverrides = async () => {
-    const { data } = await supabase.from('seller_overrides').select('*');
-    if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); }
-  };
-  const loadHrCandidates = async () => {
-    const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false });
-    if (data) setHrCandidates(data);
-  };
+  const loadSystemData = async () => { const { data } = await supabase.from('system_data').select('*').order('item_id'); if (data) setSystemData(data.map(dbToItem)); };
+  const loadAuditData = async () => { const { data } = await supabase.from('audit_data').select('*').order('item_id'); if (data) setAuditData(data.map(dbToItem)); };
+  const loadSalesHistory = async () => { const { data } = await supabase.from('sales_history').select('*'); if (data) setSalesHistory(data.map(dbToSale)); };
+  const loadDreValues = async () => { const { data } = await supabase.from('dre_values').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.dre_key] = r.values; }); setDreValues(obj); } };
+  const loadProjectionSellers = async () => { const { data } = await supabase.from('projection_sellers').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.projection_key] = r.seller_count; }); setProjectionSellers(obj); } };
+  const loadMarketingStatus = async () => { const { data } = await supabase.from('marketing_status').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.item_key] = { photo: r.photo, catalog: r.catalog, posted: r.posted, discontinued: r.discontinued }; }); setMarketingStatus(obj); } };
+  const loadCompletedIds = async () => { const { data } = await supabase.from('completed_ids').select('item_id'); if (data) setCompletedIds(new Set(data.map(r => r.item_id))); };
+  const loadSellerOverrides = async () => { const { data } = await supabase.from('seller_overrides').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); } };
+  const loadHrCandidates = async () => { const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false }); if (data) setHrCandidates(data); };
 
   useEffect(() => { loadAllData(); }, []);
 
-  // Limpar dados de meses futuros (só estado)
   useEffect(() => {
     if (salesHistory.length === 0) return;
-    const now = new Date();
-    const cy = now.getFullYear(), cm = now.getMonth() + 1;
-    const cleaned = salesHistory.filter(h => {
-      const [y, m] = h.period.split('-').map(Number);
-      return y < cy || (y === cy && m <= cm);
-    });
+    const now = new Date(); const cy = now.getFullYear(), cm = now.getMonth() + 1;
+    const cleaned = salesHistory.filter(h => { const [y, m] = h.period.split('-').map(Number); return y < cy || (y === cy && m <= cm); });
     if (cleaned.length !== salesHistory.length) setSalesHistory(cleaned);
   }, [salesHistory.length]);
 
@@ -453,15 +385,7 @@ const App = () => {
       return 'extra';
   };
 
-  const toggleSellerStatus = async (storeId, month, year, sellerName, currentStatus) => {
-      const key = `${storeId}-${month}-${year}-${sellerName}`;
-      const newStatus = currentStatus === 'active' ? 'extra' : 'active';
-      setSellerOverrides(prev => ({ ...prev, [key]: newStatus }));
-      await supabase.from('seller_overrides').upsert(
-        { store_code: storeId, override_key: key, status: newStatus, updated_at: new Date().toISOString() },
-        { onConflict: 'store_code,override_key' }
-      );
-  };
+  const toggleSellerStatus = async (storeId, month, year, sellerName, currentStatus) => { const key = `${storeId}-${month}-${year}-${sellerName}`; const ns = currentStatus === 'active' ? 'extra' : 'active'; setSellerOverrides(prev => ({ ...prev, [key]: ns })); await supabase.from('seller_overrides').upsert({ store_code: storeId, override_key: key, status: ns, updated_at: new Date().toISOString() }, { onConflict: 'store_code,override_key' }); };
 
   const getHistoricalDataForStorePeriod = (storeId, month, year) => {
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -699,103 +623,18 @@ const App = () => {
 
   // --- Handlers ---
   const handleAuditChange = useCallback((id, size, value) => {
-    const newValue = value === "" ? 0 : (parseInt(value) || 0);
-    setAuditData(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const newSizes = { ...item.sizes, [size]: newValue };
-      const newQtde = calculateTotal(newSizes);
-      supabase.from('audit_data')
-        .update({ sizes: newSizes, qtde: newQtde, updated_at: new Date().toISOString() })
-        .eq('store_code', selectedStore).eq('item_id', id);
-      return { ...item, sizes: newSizes, QTDE: newQtde };
-    }));
+    const nv = value === '' ? 0 : (parseInt(value) || 0);
+    setAuditData(prev => prev.map(item => { if (item.id !== id) return item; const ns = { ...item.sizes, [size]: nv }; const nq = calculateTotal(ns); supabase.from('audit_data').update({ sizes: ns, qtde: nq, updated_at: new Date().toISOString() }).eq('store_code', selectedStore).eq('item_id', id); return { ...item, sizes: ns, QTDE: nq }; }));
   }, [selectedStore]);
 
-  const confirmFillAuditWithSystem = async () => {
-    const filled = systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) }));
-    setAuditData(filled);
-    setShowResetModal(false);
-    await supabase.from('audit_data').delete().eq('store_code', selectedStore);
-    if (filled.length > 0) await supabase.from('audit_data').insert(filled.map(i => itemToDb(i, selectedStore)));
-  };
-
-  const toggleCompleted = async (itemId) => {
-    const newSet = new Set(completedIds);
-    if (newSet.has(itemId)) {
-      newSet.delete(itemId);
-      await supabase.from('completed_ids').delete().eq('store_code', selectedStore).eq('item_id', itemId);
-    } else {
-      newSet.add(itemId);
-      await supabase.from('completed_ids').insert({ store_code: selectedStore, item_id: itemId });
-    }
-    setCompletedIds(newSet);
-  };
-
+  const confirmFillAuditWithSystem = async () => { const filled = systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) })); setAuditData(filled); setShowResetModal(false); await supabase.from('audit_data').delete().eq('store_code', selectedStore); if (filled.length > 0) await supabase.from('audit_data').insert(filled.map(i => itemToDb(i, selectedStore))); };
+  const toggleCompleted = async (itemId) => { const ns = new Set(completedIds); if (ns.has(itemId)) { ns.delete(itemId); await supabase.from('completed_ids').delete().eq('store_code', selectedStore).eq('item_id', itemId); } else { ns.add(itemId); await supabase.from('completed_ids').insert({ store_code: selectedStore, item_id: itemId }); } setCompletedIds(ns); };
   const toggleCategory = (category) => { const newSet = new Set(expandedCategories); newSet.has(category) ? newSet.delete(category) : newSet.add(category); setExpandedCategories(newSet); };
+  const toggleMarketing = async (key, field) => { const cur = marketingStatus[key] || {}; const upd = { ...cur, [field]: !cur[field] }; setMarketingStatus(prev => ({ ...prev, [key]: upd })); await supabase.from('marketing_status').upsert({ store_code: selectedStore, item_key: key, photo: upd.photo||false, catalog: upd.catalog||false, posted: upd.posted||false, discontinued: upd.discontinued||false, updated_at: new Date().toISOString() }, { onConflict: 'store_code,item_key' }); };
+  
+  const processImport = async () => { try { const rows = importText.trim().split('\n'); if (rows.length < 2) return; const sep = rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ','); const headers = rows[0].split(sep).map(h => h.trim().toUpperCase()); const parsed = rows.slice(1).map((row, idx) => { const vals = row.split(sep); const item = { id: idx + 1, sizes: {} }; headers.forEach((h, i) => { if (sizeColumns.includes(h)) item.sizes[h] = parseInt(vals[i]) || 0; else item[h] = vals[i]; }); sizeColumns.forEach(s => { if (item.sizes[s] === undefined) item.sizes[s] = 0; }); item.QTDE = calculateTotal(item.sizes); item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || 'GENERICO'; item.TIPODESC = item.TIPODESC || 'OUTROS'; return item; }); await supabase.from('system_data').delete().eq('store_code', importTargetStore); if (parsed.length > 0) await supabase.from('system_data').insert(parsed.map(i => itemToDb(i, importTargetStore))); setSystemData(parsed); const zeroed = parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return { ...i, sizes: z, QTDE: 0 }; }); await supabase.from('audit_data').delete().eq('store_code', importTargetStore); if (zeroed.length > 0) await supabase.from('audit_data').insert(zeroed.map(i => itemToDb(i, importTargetStore))); setAuditData(zeroed); await supabase.from('completed_ids').delete().eq('store_code', importTargetStore); setCompletedIds(new Set()); setShowImportModal(false); setImportText(''); alert('Importado!'); } catch(e) { console.error(e); alert('Erro importação'); } };
 
-  const toggleMarketing = async (key, field) => {
-    const current = marketingStatus[key] || {};
-    const updated = { ...current, [field]: !current[field] };
-    setMarketingStatus(prev => ({ ...prev, [key]: updated }));
-    await supabase.from('marketing_status').upsert(
-      { store_code: selectedStore, item_key: key, photo: updated.photo||false, catalog: updated.catalog||false, posted: updated.posted||false, discontinued: updated.discontinued||false, updated_at: new Date().toISOString() },
-      { onConflict: 'store_code,item_key' }
-    );
-  };
-
-  const processImport = async () => {
-    try {
-      const rows = importText.trim().split('\n'); if (rows.length < 2) return;
-      const sep = rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ',');
-      const headers = rows[0].split(sep).map(h => h.trim().toUpperCase());
-      const parsed = rows.slice(1).map((row, idx) => {
-        const vals = row.split(sep);
-        const item = { id: idx + 1, sizes: {} };
-        headers.forEach((h, i) => { if (sizeColumns.includes(h)) item.sizes[h] = parseInt(vals[i]) || 0; else item[h] = vals[i]; });
-        sizeColumns.forEach(s => { if (item.sizes[s] === undefined) item.sizes[s] = 0; });
-        item.QTDE = calculateTotal(item.sizes);
-        item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || "GENERICO"; item.TIPODESC = item.TIPODESC || "OUTROS";
-        return item;
-      });
-      await supabase.from('system_data').delete().eq('store_code', importTargetStore);
-      if (parsed.length > 0) await supabase.from('system_data').insert(parsed.map(i => itemToDb(i, importTargetStore)));
-      setSystemData(parsed);
-      const zeroed = parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return { ...i, sizes: z, QTDE: 0 }; });
-      await supabase.from('audit_data').delete().eq('store_code', importTargetStore);
-      if (zeroed.length > 0) await supabase.from('audit_data').insert(zeroed.map(i => itemToDb(i, importTargetStore)));
-      setAuditData(zeroed);
-      await supabase.from('completed_ids').delete().eq('store_code', importTargetStore);
-      setCompletedIds(new Set());
-      setShowImportModal(false); setImportText(""); alert("Importado com sucesso!");
-    } catch(e) { console.error(e); alert("Erro na importação"); }
-  };
-
-  const processSalesHistoryImport = async () => {
-    const now = new Date();
-    if (selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth() + 1)) {
-      alert("Não é possível importar dados de meses futuros."); return;
-    }
-    try {
-      const period = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      const rows = historyImportText.trim().split('\n');
-      const newEntries = rows.map(row => {
-        const cols = row.split('\t');
-        if (cols.length < 5 || isNaN(parseInt(cols[0]))) return null;
-        return {
-          storeCode: importTargetStore, sellerCode: cols[1]?.trim(), sellerName: cols[2]?.trim(),
-          daysWorked: parseInt(cols[3])||0, salesCount: parseInt(cols[4])||0, itemsCount: parseInt(cols[6])||0,
-          pa: parseFloat(cols[8]?.replace(',','.'))||0, totalSales: parseCurrency(cols[10]),
-          ticketAvg: parseCurrency(cols[12]), period
-        };
-      }).filter(Boolean);
-      await supabase.from('sales_history').delete().eq('store_code', importTargetStore).eq('period', period);
-      const base = salesHistory.filter(h => !(h.period === period && h.storeCode === importTargetStore));
-      if (newEntries.length > 0) await supabase.from('sales_history').insert(newEntries.map(saleToDb));
-      setSalesHistory([...base, ...newEntries]);
-      setShowHistoryImportModal(false); setHistoryImportText(""); setClearBeforeImport(false);
-      alert("Histórico importado com sucesso!");
-    } catch(e) { console.error(e); alert("Erro na importação do histórico"); }
-  };
+  const processSalesHistoryImport = async () => { const now = new Date(); if (selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth() + 1)) { alert('Não é possível importar dados de meses futuros.'); return; } try { const period = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`; const rows = historyImportText.trim().split('\n'); const newEntries = rows.map(row => { const cols = row.split('\t'); if (cols.length < 5 || isNaN(parseInt(cols[0]))) return null; return { storeCode: importTargetStore, sellerCode: cols[1]?.trim(), sellerName: cols[2]?.trim(), daysWorked: parseInt(cols[3])||0, salesCount: parseInt(cols[4])||0, itemsCount: parseInt(cols[6])||0, pa: parseFloat(cols[8]?.replace(',','.'))||0, totalSales: parseCurrency(cols[10]), ticketAvg: parseCurrency(cols[12]), period }; }).filter(Boolean); await supabase.from('sales_history').delete().eq('store_code', importTargetStore).eq('period', period); const base = salesHistory.filter(h => !(h.period === period && h.storeCode === importTargetStore)); if (newEntries.length > 0) await supabase.from('sales_history').insert(newEntries.map(saleToDb)); setSalesHistory([...base, ...newEntries]); setShowHistoryImportModal(false); setHistoryImportText(''); setClearBeforeImport(false); alert('Histórico importado!'); } catch(e) { console.error(e); alert('Erro importação histórico'); } };
 
   const handleExport = () => {
     if (differences.length === 0) { alert("Sem dados"); return; }
@@ -870,14 +709,7 @@ const App = () => {
     const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
     const dreKey = `${selectedStore}-${selectedMonth}-${selectedYear}`;
     const savedDre = dreValues[dreKey] || {};
-    const updateDreValue = (field, value) => {
-      const updatedDre = { ...(dreValues[dreKey] || {}), [field]: parseFloat(value) || 0 };
-      setDreValues(prev => ({ ...prev, [dreKey]: updatedDre }));
-      supabase.from('dre_values').upsert(
-        { store_code: selectedStore, dre_key: dreKey, values: updatedDre, updated_at: new Date().toISOString() },
-        { onConflict: 'store_code,dre_key' }
-      );
-    };
+    const updateDreValue = (field, value) => { const upd = { ...(dreValues[dreKey] || {}), [field]: parseFloat(value) || 0 }; setDreValues(prev => ({ ...prev, [dreKey]: upd })); supabase.from('dre_values').upsert({ store_code: selectedStore, dre_key: dreKey, values: upd, updated_at: new Date().toISOString() }, { onConflict: 'store_code,dre_key' }); };
     const receitaBruta = totalSalesMonth;
     const percCMV = savedDre.percCMV ?? finData.config.variableCosts.cmv;
     const percImpostos = savedDre.percImpostos ?? finData.config.variableCosts.imposto;
@@ -2149,14 +1981,7 @@ const App = () => {
     );
   };
 
-  if (dbLoading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900">
-      <div className="text-center">
-        <div className="text-white text-xl font-bold animate-pulse mb-2">Carregando dados...</div>
-        <div className="text-indigo-300 text-sm">Conectando ao banco de dados</div>
-      </div>
-    </div>
-  );
+  if (dbLoading) return (<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900"><div className="text-center"><div className="text-white text-xl font-bold animate-pulse mb-2">Carregando dados...</div><div className="text-indigo-300 text-sm">Conectando ao banco de dados</div></div></div>);
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-slate-800 font-sans pb-20 ${printMode ? 'bg-white' : ''}`}>
@@ -2232,10 +2057,7 @@ const App = () => {
             <button onClick={() => navigateTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 6. DRE</button>
             <button onClick={() => navigateTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 7. Metas</button>
             <button onClick={() => navigateTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'hr' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Briefcase className="w-4 h-4 inline mr-1"/> 8. RH</button>
-            <div className="ml-auto flex items-center px-4 gap-2">
-              {userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}
-              <button onClick={() => supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button>
-            </div>
+            <div className="ml-auto flex items-center px-4 gap-2">{userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}<button onClick={() => supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button></div>
           </div>
         </nav>
       )}
@@ -2600,246 +2422,111 @@ const App = () => {
   );
 };
 
+
   // ── RH TAB ────────────────────────────────────────────────
-
   const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
-
-  const STATUS_COLORS = {
-    'Banco de Talentos':          { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
-    'Recusado':                   { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
-    'Contratado':                 { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
-    'Em análise':                 { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
-    'Entrevista agendada':        { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
-    'Entrevista realizada':       { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
-    'Aguardando retorno':         { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+  const HR_STATUS_COLORS = {
+    'Banco de Talentos':    { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
+    'Recusado':             { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
+    'Contratado':           { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
+    'Em an\u00e1lise':        { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+    'Entrevista agendada':  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
+    'Entrevista realizada': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+    'Aguardando retorno':   { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
   };
-
   const processHrImport = async () => {
     const lines = hrImportText.trim().split('\n').filter(Boolean);
     if (lines.length === 0) { alert('Cole os dados antes de processar'); return; }
     const entries = lines.map(line => {
-      const c = line.split('\t');
-      return {
-        store_code: selectedStore,
-        candidato:           c[0]?.trim() || '',
-        telefone:            c[1]?.trim() || null,
-        recebimento_curriculo: c[2]?.trim() || null,
-        data_resposta:       c[3]?.trim() || null,
-        status_processo:     c[4]?.trim() || null,
-        motivo_detalhes:     c[5]?.trim() || null,
-        entrevista_agendada: c[6]?.trim() || null,
-        nota_interna:        c[9]?.trim() || null,
-        fonte_captacao:      c[10]?.trim() || null,
-        observacoes:         c[11]?.trim() || null,
-        retornou:            c[12]?.trim()?.toUpperCase() === 'TRUE',
-        interessado:         c[13]?.trim()?.toUpperCase() === 'TRUE',
-        recusa:              c[14]?.trim()?.toUpperCase() === 'TRUE',
-        desvio:              c[15]?.trim()?.toUpperCase() === 'TRUE',
-        responsavel:         c[16]?.trim() || null,
-        whatsapp:            c[17]?.trim() || null,
-        etapa_maxima:        c[20]?.trim() || null,
-        macro_status_final:  c[21]?.trim() || null,
-        gargalo:             c[22]?.trim() || null,
-      };
+      const col = line.split('\t');
+      return { store_code: selectedStore, candidato: col[0]?.trim() || '', telefone: col[1]?.trim() || null, recebimento_curriculo: col[2]?.trim() || null, data_resposta: col[3]?.trim() || null, status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: col[6]?.trim() || null, nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
     }).filter(e => e.candidato);
     if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
     const { error } = await supabase.from('hr_candidates').insert(entries);
-    if (error) { alert('Erro ao importar: ' + error.message); return; }
+    if (error) { alert('Erro: ' + error.message); return; }
     await loadHrCandidates();
-    setShowHrImportModal(false);
-    setHrImportText('');
-    alert(entries.length + ' candidato(s) importado(s) com sucesso!');
+    setShowHrImportModal(false); setHrImportText('');
+    alert(entries.length + ' candidato(s) importado(s)!');
   };
-
   const renderHrTab = () => {
-    const STATUSES = ['all', 'Banco de Talentos', 'Em análise', 'Entrevista agendada', 'Entrevista realizada', 'Contratado', 'Recusado', 'Aguardando retorno'];
-    const filtered = hrCandidates.filter(c => {
-      const matchFilter = hrFilter === 'all' || c.status_processo === hrFilter;
-      const matchSearch = !hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch);
-      return matchFilter && matchSearch;
-    });
-
-    const stats = {
-      total: hrCandidates.length,
-      interessados: hrCandidates.filter(c => c.interessado).length,
-      entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length,
-      contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length,
-    };
-
+    const STATUSES = ['all','Banco de Talentos','Em an\u00e1lise','Entrevista agendada','Entrevista realizada','Contratado','Recusado','Aguardando retorno'];
+    const filtered = hrCandidates.filter(c => (hrFilter === 'all' || c.status_processo === hrFilter) && (!hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch)));
+    const stats = { total: hrCandidates.length, interessados: hrCandidates.filter(c => c.interessado).length, entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length, contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length };
     return (
       <div className="space-y-4">
-        {/* Header */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div>
-              <div>
-                <h2 className="font-bold text-gray-800 text-lg">Recrutamento & Seleção</h2>
-                <p className="text-xs text-gray-500">Gestão de candidatos e processos seletivos</p>
-              </div>
-            </div>
-            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors">
-              <Upload className="w-4 h-4"/> Importar Candidatos
-            </button>
+            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Sele\u00e7\u00e3o</h2><p className="text-xs text-gray-500">Gest\u00e3o de candidatos</p></div></div>
+            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><Upload className="w-4 h-4"/> Importar Candidatos</button>
           </div>
-
-          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            {[
-              { label: 'Total', value: stats.total, color: 'text-gray-700', bg: 'bg-gray-50' },
-              { label: 'Interessados', value: stats.interessados, color: 'text-blue-700', bg: 'bg-blue-50' },
-              { label: 'Entrevistas', value: stats.entrevistas, color: 'text-purple-700', bg: 'bg-purple-50' },
-              { label: 'Contratados', value: stats.contratados, color: 'text-green-700', bg: 'bg-green-50' },
-            ].map(s => (
-              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
-                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
-              </div>
+            {[{label:'Total',value:stats.total,color:'text-gray-700',bg:'bg-gray-50'},{label:'Interessados',value:stats.interessados,color:'text-blue-700',bg:'bg-blue-50'},{label:'Entrevistas',value:stats.entrevistas,color:'text-purple-700',bg:'bg-purple-50'},{label:'Contratados',value:stats.contratados,color:'text-green-700',bg:'bg-green-50'}].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-gray-500 mt-0.5">{s.label}</div></div>
             ))}
           </div>
         </div>
-
-        {/* Filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-48">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/>
-              <input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato ou telefone..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {STATUSES.map(s => (
-                <button key={s} onClick={() => setHrFilter(s)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>
-                  {s === 'all' ? 'Todos' : s}
-                </button>
-              ))}
-            </div>
+            <div className="relative flex-1 min-w-48"><Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/><input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/></div>
+            <div className="flex flex-wrap gap-1.5">{STATUSES.map(s => (<button key={s} onClick={() => setHrFilter(s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>{s === 'all' ? 'Todos' : s}</button>))}</div>
           </div>
         </div>
-
-        {/* Candidate List */}
         <div className="space-y-2">
-          {filtered.length === 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-              <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/>
-              <p className="text-gray-500 font-medium">Nenhum candidato encontrado</p>
-              <p className="text-gray-400 text-sm mt-1">Importe candidatos usando o botão acima</p>
-            </div>
-          )}
-          {filtered.map(c => {
-            const isOpen = hrExpanded.has(c.id);
-            const sc = STATUS_COLORS[c.status_processo] || STATUS_COLORS['Banco de Talentos'];
-            const toggleExpand = () => {
-              const ns = new Set(hrExpanded);
-              ns.has(c.id) ? ns.delete(c.id) : ns.add(c.id);
-              setHrExpanded(ns);
-            };
+          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o bot\u00e3o acima</p></div>)}
+          {filtered.map(cand => {
+            const isOpen = hrExpanded.has(cand.id);
+            const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
+            const toggleExpand = () => { const ns = new Set(hrExpanded); ns.has(cand.id) ? ns.delete(cand.id) : ns.add(cand.id); setHrExpanded(ns); };
             return (
-              <div key={c.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* Row header */}
+              <div key={cand.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleExpand}>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-800">{c.candidato}</span>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{c.status_processo || '—'}</span>
-                      {c.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">✓ Interessado</span>}
-                      {c.macro_status_final && <span className="text-xs text-gray-400 hidden md:block">{c.macro_status_final}</span>}
+                      <span className="font-semibold text-gray-800">{cand.candidato}</span>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '\u2014'}</span>
+                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">\u2713 Interessado</span>}
                     </div>
                     <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
-                      {c.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{c.telefone}</span>}
-                      {c.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Currículo: {formatDateBR(c.recebimento_curriculo)}</span>}
-                      {c.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(c.entrevista_agendada)}</span>}
-                      {c.fonte_captacao && <span className="text-gray-400">{c.fonte_captacao}</span>}
+                      {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
+                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Curr\u00edculo: {formatDateBR(cand.recebimento_curriculo)}</span>}
+                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(cand.entrevista_agendada)}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {c.gargalo && c.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500" title={c.gargalo}/>}
-                    {c.whatsapp && (
-                      <a href={`https://wa.me/${c.whatsapp?.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200 transition-colors">
-                        <MessageCircle className="w-3.5 h-3.5"/> WA
-                      </a>
-                    )}
+                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500"/>}
+                    {cand.whatsapp && (<a href={`https://wa.me/${cand.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200"><MessageCircle className="w-3.5 h-3.5"/> WA</a>)}
                     {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
                   </div>
                 </div>
-
-                {/* Expanded details */}
                 {isOpen && (
-                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-4">
+                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        { label: 'Data de Resposta',    value: formatDateBR(c.data_resposta) },
-                        { label: 'Entrevista',          value: formatDateBR(c.entrevista_agendada) },
-                        { label: 'Responsável',         value: c.responsavel },
-                        { label: 'Etapa Máxima',        value: c.etapa_maxima },
-                        { label: 'Macro Status',        value: c.macro_status_final },
-                        { label: 'Gargalo',             value: c.gargalo },
-                        { label: 'Fonte Captação',      value: c.fonte_captacao },
-                        { label: 'Nota Interna',        value: c.nota_interna },
-                      ].map(f => f.value && f.value !== '—' ? (
-                        <div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100">
-                          <div className="text-xs text-gray-400 mb-0.5">{f.label}</div>
-                          <div className="text-sm font-medium text-gray-700">{f.value}</div>
-                        </div>
-                      ) : null)}
+                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Respons\u00e1vel',value:cand.responsavel},{label:'Etapa M\u00e1xima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '\u2014').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
                     </div>
-
-                    {/* Flags */}
                     <div className="flex flex-wrap gap-2">
-                      {c.retornou   && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
-                      {c.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">✓ Interessado</span>}
-                      {c.recusa     && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
-                      {c.desvio     && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
+                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">\u21a9 Retornou</span>}
+                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">\u2713 Interessado</span>}
+                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">\u2717 Recusa</span>}
+                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">\u26a0 Desvio</span>}
                     </div>
-
-                    {/* Motivo / Observações */}
-                    {c.motivo_detalhes && (
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div>
-                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.motivo_detalhes}</p>
-                      </div>
-                    )}
-                    {c.observacoes && (
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <div className="text-xs text-gray-400 mb-1">📝 Observações</div>
-                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.observacoes}</p>
-                      </div>
-                    )}
-                    {c.gargalo && c.gargalo !== 'Fluxo ok' && (
-                      <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-                        <div className="text-xs text-orange-500 mb-1">⚠️ Gargalo identificado</div>
-                        <p className="text-sm text-orange-700 font-medium">{c.gargalo}</p>
-                      </div>
-                    )}
+                    {cand.motivo_detalhes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.motivo_detalhes}</p></div>)}
+                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">\U0001f4dd Observa\u00e7\u00f5es</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
+                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">\u26a0\ufe0f Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-
-        {/* Import Modal */}
         {showHrImportModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-              <div className="p-5 border-b flex items-center justify-between">
-                <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3>
-                <button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button>
-              </div>
+              <div className="p-5 border-b flex items-center justify-between"><h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3><button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button></div>
               <div className="p-5 space-y-4">
-                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200">
-                  <strong>Formato:</strong> Cole diretamente do Excel/Sheets. Colunas na ordem: Candidato, Telefone, Recebimento currículo, Data resposta, Status, Motivo, Entrevista agendada, Dias resp., Dias entrevista, Horas, Status entrevista, Data teste, Nota, Fonte, Observações, Alerta, Retornou, Interessados, Recusas, Desvios, Responsável, WhatsApp, Última atualização data, hora, Etapa Máxima, Macro Status, Gargalo
-                </div>
-                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)}
-                  placeholder="Cole aqui os dados copiados do Excel..." rows={10}
-                  className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
+                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200"><strong>Formato:</strong> Cole direto do Excel. Colunas na ordem do seu sistema de RH.</div>
+                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..." rows={10} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
               </div>
-              <div className="p-5 border-t flex justify-end gap-3">
-                <button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button>
-                <button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button>
-              </div>
+              <div className="p-5 border-t flex justify-end gap-3"><button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button><button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button></div>
             </div>
           </div>
         )}
