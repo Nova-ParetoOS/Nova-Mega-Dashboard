@@ -279,7 +279,7 @@ const CategoryDetailPanel = ({ category, items, onClose }) => {
 // ==========================================
 const App = () => {
   // --- Estados de Interface ---
-  const [activeTab, setActiveTab] = useState(() => { const p = new URLSearchParams(window.location.search); const t = p.get('tab'); return ['system','audit','diff','dashboard','marketing','viability','goals','hr'].includes(t) ? t : 'audit'; });
+  const [activeTab, setActiveTab] = useState(() => { const p = new URLSearchParams(window.location.search); const t = p.get('tab'); return ['system','audit','dashboard','marketing','viability','goals','hr'].includes(t) ? t : 'audit'; });
   const navigateTab = (tab) => { setActiveTab(tab); const u = new URL(window.location); u.searchParams.set('tab', tab); window.history.replaceState({}, '', u); };
   const [searchTerm, setSearchTerm] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
@@ -358,6 +358,10 @@ const App = () => {
   const loadHrCandidates = async () => { const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false }); if (data) setHrCandidates(data); };
 
   useEffect(() => { loadAllData(); }, []);
+
+  const loadStoreData = async () => {
+    await Promise.all([loadSystemData(), loadAuditData(), loadMarketingStatus(), loadCompletedIds(), loadSellerOverrides()]);
+  };
 
   useEffect(() => {
     if (salesHistory.length === 0) return;
@@ -1983,6 +1987,116 @@ const App = () => {
 
   if (dbLoading) return (<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900"><div className="text-center"><div className="text-white text-xl font-bold animate-pulse mb-2">Carregando dados...</div><div className="text-indigo-300 text-sm">Conectando ao banco de dados</div></div></div>);
 
+  // ── RH TAB ────────────────────────────────────────────────
+  const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
+  const HR_STATUS_COLORS = {
+    'Banco de Talentos':    { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
+    'Recusado':             { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
+    'Contratado':           { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
+    'Em análise':        { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+    'Entrevista agendada':  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
+    'Entrevista realizada': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+    'Aguardando retorno':   { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+  };
+  const processHrImport = async () => {
+    const lines = hrImportText.trim().split('\n').filter(Boolean);
+    if (lines.length === 0) { alert('Cole os dados antes de processar'); return; }
+    const entries = lines.map(line => {
+      const col = line.split('\t');
+      return { store_code: selectedStore, candidato: col[0]?.trim() || '', telefone: col[1]?.trim() || null, recebimento_curriculo: col[2]?.trim() || null, data_resposta: col[3]?.trim() || null, status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: col[6]?.trim() || null, nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
+    }).filter(e => e.candidato);
+    if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
+    const { error } = await supabase.from('hr_candidates').insert(entries);
+    if (error) { alert('Erro: ' + error.message); return; }
+    await loadHrCandidates();
+    setShowHrImportModal(false); setHrImportText('');
+    alert(entries.length + ' candidato(s) importado(s)!');
+  };
+  const renderHrTab = () => {
+    const STATUSES = ['all','Banco de Talentos','Em análise','Entrevista agendada','Entrevista realizada','Contratado','Recusado','Aguardando retorno'];
+    const filtered = hrCandidates.filter(c => (hrFilter === 'all' || c.status_processo === hrFilter) && (!hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch)));
+    const stats = { total: hrCandidates.length, interessados: hrCandidates.filter(c => c.interessado).length, entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length, contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length };
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Sele\u00e7\u00e3o</h2><p className="text-xs text-gray-500">Gest\u00e3o de candidatos</p></div></div>
+            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><Upload className="w-4 h-4"/> Importar Candidatos</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            {[{label:'Total',value:stats.total,color:'text-gray-700',bg:'bg-gray-50'},{label:'Interessados',value:stats.interessados,color:'text-blue-700',bg:'bg-blue-50'},{label:'Entrevistas',value:stats.entrevistas,color:'text-purple-700',bg:'bg-purple-50'},{label:'Contratados',value:stats.contratados,color:'text-green-700',bg:'bg-green-50'}].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-gray-500 mt-0.5">{s.label}</div></div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-48"><Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/><input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/></div>
+            <div className="flex flex-wrap gap-1.5">{STATUSES.map(s => (<button key={s} onClick={() => setHrFilter(s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>{s === 'all' ? 'Todos' : s}</button>))}</div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o bot\u00e3o acima</p></div>)}
+          {filtered.map(cand => {
+            const isOpen = hrExpanded.has(cand.id);
+            const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
+            const toggleExpand = () => { const ns = new Set(hrExpanded); ns.has(cand.id) ? ns.delete(cand.id) : ns.add(cand.id); setHrExpanded(ns); };
+            return (
+              <div key={cand.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleExpand}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-gray-800">{cand.candidato}</span>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '\u2014'}</span>
+                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">\u2713 Interessado</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+                      {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
+                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Curr\u00edculo: {formatDateBR(cand.recebimento_curriculo)}</span>}
+                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(cand.entrevista_agendada)}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500"/>}
+                    {cand.whatsapp && (<a href={`https://wa.me/${cand.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200"><MessageCircle className="w-3.5 h-3.5"/> WA</a>)}
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Respons\u00e1vel',value:cand.responsavel},{label:'Etapa M\u00e1xima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '\u2014').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">\u21a9 Retornou</span>}
+                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">\u2713 Interessado</span>}
+                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">\u2717 Recusa</span>}
+                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">\u26a0 Desvio</span>}
+                    </div>
+                    {cand.motivo_detalhes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.motivo_detalhes}</p></div>)}
+                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">\U0001f4dd Observa\u00e7\u00f5es</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
+                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">\u26a0\ufe0f Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {showHrImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+              <div className="p-5 border-b flex items-center justify-between"><h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3><button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button></div>
+              <div className="p-5 space-y-4">
+                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200"><strong>Formato:</strong> Cole direto do Excel. Colunas na ordem do seu sistema de RH.</div>
+                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..." rows={10} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
+              </div>
+              <div className="p-5 border-t flex justify-end gap-3"><button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button><button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button></div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-slate-800 font-sans pb-20 ${printMode ? 'bg-white' : ''}`}>
       <style>{`@media print { @page { margin: 1.5cm; size: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; } .no-print { display: none !important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
@@ -2051,12 +2165,11 @@ const App = () => {
           <div className="max-w-7xl mx-auto flex px-4">
             <button onClick={() => navigateTab('system')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'system' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Package className="w-4 h-4 inline mr-1"/> 1. Sistema</button>
             <button onClick={() => navigateTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'audit' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><CheckCircle className="w-4 h-4 inline mr-1"/> 2. Contagem</button>
-            <button onClick={() => navigateTab('diff')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'diff' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><AlertTriangle className="w-4 h-4 inline mr-1"/> 3. Divergências</button>
-            <button onClick={() => navigateTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 4. Dashboard</button>
-            <button onClick={() => navigateTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 5. Divulgação</button>
-            <button onClick={() => navigateTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 6. DRE</button>
-            <button onClick={() => navigateTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 7. Metas</button>
-            <button onClick={() => navigateTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'hr' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Briefcase className="w-4 h-4 inline mr-1"/> 8. RH</button>
+            <button onClick={() => navigateTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 3. Dashboard</button>
+            <button onClick={() => navigateTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 4. Divulgação</button>
+            <button onClick={() => navigateTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 5. DRE</button>
+            <button onClick={() => navigateTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 6. Metas</button>
+            <button onClick={() => navigateTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'hr' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Briefcase className="w-4 h-4 inline mr-1"/> 7. RH</button>
             <div className="ml-auto flex items-center px-4 gap-2">{userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}<button onClick={() => supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button></div>
           </div>
         </nav>
@@ -2068,6 +2181,15 @@ const App = () => {
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
              <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex justify-between items-center">
                  <h2 className="font-bold text-gray-700 flex items-center gap-2"><Package className="w-5 h-5"/> Estoque no Sistema</h2>
+<div className="flex items-center gap-2">
+                   <span className="text-xs text-gray-500 font-medium">Loja:</span>
+                   <select value={selectedStore} onChange={async (e) => { setSelectedStore(e.target.value); setTimeout(loadStoreData, 50); }}
+                     className="text-sm font-bold border border-blue-200 rounded-lg px-3 py-1.5 bg-white text-blue-700 focus:ring-2 focus:ring-blue-300 focus:outline-none">
+                     {(userRole === 'owner' ? ['3','4','7','8','10'] : userStoreAccess).map(s => (
+                       <option key={s} value={s}>Loja {s}</option>
+                     ))}
+                   </select>
+                 </div>
                  <button onClick={() => setShowImportModal(true)} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-all shadow-md"><Upload className="w-4 h-4 mr-2"/> Importar</button>
              </div>
              <div className="overflow-x-auto">
@@ -2090,9 +2212,21 @@ const App = () => {
         )}
 
         {activeTab === 'audit' && (
+          <div className="space-y-0">
              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
                 <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-emerald-50">
-                    <h2 className="font-bold text-green-800 flex items-center gap-2"><CheckCircle className="w-5 h-5"/> Contagem Física</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="font-bold text-green-800 flex items-center gap-2"><CheckCircle className="w-5 h-5"/> Contagem Física</h2>
+                      <div className="flex items-center gap-2 ml-4">
+                        <span className="text-xs text-gray-500 font-medium">Loja:</span>
+                        <select value={selectedStore} onChange={async (e) => { setSelectedStore(e.target.value); setTimeout(loadStoreData, 50); }}
+                          className="text-sm font-bold border border-green-200 rounded-lg px-3 py-1.5 bg-white text-green-700 focus:ring-2 focus:ring-green-300 focus:outline-none">
+                          {(userRole === 'owner' ? ['3','4','7','8','10'] : userStoreAccess).map(s => (
+                            <option key={s} value={s}>Loja {s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <button onClick={() => setShowResetModal(true)} className="text-xs text-green-700 underline hover:text-green-900 transition-colors flex items-center gap-1"><Copy className="w-3 h-3"/> Preencher c/ Sistema</button>
                 </div>
                 <div className="p-4 bg-gray-50">
@@ -2115,9 +2249,16 @@ const App = () => {
                  </table>
              </div>
              </div>
-        )}
 
-        {activeTab === 'diff' && (
+              {/* === DIVERGENCIAS === */}
+              <div className="mt-10 pt-8 border-t-4 border-dashed border-red-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-red-100 p-2 rounded-xl"><AlertTriangle className="w-5 h-5 text-red-500"/></div>
+                  <div>
+                    <h2 className="font-bold text-red-700 text-lg">Relatório de Divergências</h2>
+                    <p className="text-xs text-gray-500">Diferenças entre estoque no sistema e contagem física</p>
+                  </div>
+                </div>
              <div className="max-w-4xl mx-auto space-y-6">
                  <div className="bg-white p-6 rounded-2xl border shadow-lg">
                      <h2 className="font-bold text-gray-800 mb-4 text-xl flex items-center gap-2"><AlertTriangle className="w-6 h-6 text-red-500"/> Relatório de Divergências</h2>
@@ -2135,9 +2276,11 @@ const App = () => {
                      )}
                  </div>
              </div>
-        )}
+              </div>
 
-        {/* ABA 4: DASHBOARD — COM FILTROS */}
+          </div>
+        )}
+        {/* ABA 3: DASHBOARD */}
         {activeTab === 'dashboard' && (
             <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border shadow-lg">
@@ -2255,7 +2398,9 @@ const App = () => {
                                 {dashboardCategoryFilter && <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full text-xs">{dashboardCategoryFilter}</span>}
                               </h4>
                               <span className="text-xs text-purple-600 font-bold">
-                                {dashboardFilteredItems.reduce((acc, i) => acc + calculateTotal(i.sizes), 0)} peças
+                                {dashboardSizeFilter
+                                  ? dashboardFilteredItems.reduce((acc, i) => acc + (parseInt(i.sizes[dashboardSizeFilter]) || 0), 0)
+                                  : dashboardFilteredItems.reduce((acc, i) => acc + calculateTotal(i.sizes), 0)} peças
                               </span>
                             </div>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -2266,7 +2411,9 @@ const App = () => {
                                 </div>
                               ) : dashboardFilteredItems.map(item => {
                                 const sizesInStock = sizeColumns.filter(s => (parseInt(item.sizes[s]) || 0) > 0);
-                                const total = calculateTotal(item.sizes);
+                                const total = dashboardSizeFilter
+                                  ? (parseInt(item.sizes[dashboardSizeFilter]) || 0)
+                                  : calculateTotal(item.sizes);
                                 return (
                                   <div key={item.id} className="bg-white rounded-xl border border-purple-100 p-3 hover:shadow-md hover:border-purple-300 transition-all">
                                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -2421,118 +2568,5 @@ const App = () => {
     </div>
   );
 };
-
-  // ── RH TAB ────────────────────────────────────────────────
-  const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
-  const HR_STATUS_COLORS = {
-    'Banco de Talentos':    { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
-    'Recusado':             { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
-    'Contratado':           { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
-    'Em an\u00e1lise':        { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
-    'Entrevista agendada':  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
-    'Entrevista realizada': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
-    'Aguardando retorno':   { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
-  };
-  const processHrImport = async () => {
-    const lines = hrImportText.trim().split('\n').filter(Boolean);
-    if (lines.length === 0) { alert('Cole os dados antes de processar'); return; }
-    const entries = lines.map(line => {
-      const col = line.split('\t');
-      return { store_code: selectedStore, candidato: col[0]?.trim() || '', telefone: col[1]?.trim() || null, recebimento_curriculo: col[2]?.trim() || null, data_resposta: col[3]?.trim() || null, status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: col[6]?.trim() || null, nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
-    }).filter(e => e.candidato);
-    if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
-    const { error } = await supabase.from('hr_candidates').insert(entries);
-    if (error) { alert('Erro: ' + error.message); return; }
-    await loadHrCandidates();
-    setShowHrImportModal(false); setHrImportText('');
-    alert(entries.length + ' candidato(s) importado(s)!');
-  };
-  const renderHrTab = () => {
-    const STATUSES = ['all','Banco de Talentos','Em an\u00e1lise','Entrevista agendada','Entrevista realizada','Contratado','Recusado','Aguardando retorno'];
-    const filtered = hrCandidates.filter(c => (hrFilter === 'all' || c.status_processo === hrFilter) && (!hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch)));
-    const stats = { total: hrCandidates.length, interessados: hrCandidates.filter(c => c.interessado).length, entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length, contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length };
-    return (
-      <div className="space-y-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Sele\u00e7\u00e3o</h2><p className="text-xs text-gray-500">Gest\u00e3o de candidatos</p></div></div>
-            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><Upload className="w-4 h-4"/> Importar Candidatos</button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            {[{label:'Total',value:stats.total,color:'text-gray-700',bg:'bg-gray-50'},{label:'Interessados',value:stats.interessados,color:'text-blue-700',bg:'bg-blue-50'},{label:'Entrevistas',value:stats.entrevistas,color:'text-purple-700',bg:'bg-purple-50'},{label:'Contratados',value:stats.contratados,color:'text-green-700',bg:'bg-green-50'}].map(s => (
-              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-gray-500 mt-0.5">{s.label}</div></div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-48"><Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/><input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/></div>
-            <div className="flex flex-wrap gap-1.5">{STATUSES.map(s => (<button key={s} onClick={() => setHrFilter(s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>{s === 'all' ? 'Todos' : s}</button>))}</div>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o bot\u00e3o acima</p></div>)}
-          {filtered.map(cand => {
-            const isOpen = hrExpanded.has(cand.id);
-            const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
-            const toggleExpand = () => { const ns = new Set(hrExpanded); ns.has(cand.id) ? ns.delete(cand.id) : ns.add(cand.id); setHrExpanded(ns); };
-            return (
-              <div key={cand.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleExpand}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-800">{cand.candidato}</span>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '\u2014'}</span>
-                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">\u2713 Interessado</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
-                      {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
-                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Curr\u00edculo: {formatDateBR(cand.recebimento_curriculo)}</span>}
-                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(cand.entrevista_agendada)}</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500"/>}
-                    {cand.whatsapp && (<a href={`https://wa.me/${cand.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200"><MessageCircle className="w-3.5 h-3.5"/> WA</a>)}
-                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
-                  </div>
-                </div>
-                {isOpen && (
-                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Respons\u00e1vel',value:cand.responsavel},{label:'Etapa M\u00e1xima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '\u2014').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">\u21a9 Retornou</span>}
-                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">\u2713 Interessado</span>}
-                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">\u2717 Recusa</span>}
-                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">\u26a0 Desvio</span>}
-                    </div>
-                    {cand.motivo_detalhes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.motivo_detalhes}</p></div>)}
-                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">\U0001f4dd Observa\u00e7\u00f5es</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
-                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">\u26a0\ufe0f Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {showHrImportModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-              <div className="p-5 border-b flex items-center justify-between"><h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3><button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button></div>
-              <div className="p-5 space-y-4">
-                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200"><strong>Formato:</strong> Cole direto do Excel. Colunas na ordem do seu sistema de RH.</div>
-                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..." rows={10} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
-              </div>
-              <div className="p-5 border-t flex justify-end gap-3"><button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button><button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button></div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-
 
 export default App;
