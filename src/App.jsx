@@ -2422,7 +2422,6 @@ const App = () => {
   );
 };
 
-
   // ── RH TAB ────────────────────────────────────────────────
   const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
   const HR_STATUS_COLORS = {
@@ -2533,5 +2532,7 @@ const App = () => {
       </div>
     );
   };
+
+
 
 export default App;
