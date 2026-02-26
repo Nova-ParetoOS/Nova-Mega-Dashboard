@@ -2000,16 +2000,20 @@ const App = () => {
     // Helper: normalize date from DD/MM/YYYY or YYYY-MM-DD to YYYY-MM-DD, else null
     const normDate = (s) => {
       if (!s || s.trim() === '' || s.trim() === '-' || s.trim() === '—') return null;
-      const v = s.trim();
+      // Remove time portion if present: "2/24/2026 0" or "2/24/2026 15:12:43"
+      const v = s.trim().split(' ')[0];
       // Already ISO format YYYY-MM-DD
       if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-      // DD/MM/YYYY format
+      // DD/MM/YYYY or MM/DD/YYYY — detect by checking if parts[1] > 12 (must be day not month)
       const parts = v.split('/');
       if (parts.length === 3) {
-        const [d, m, y] = parts;
-        if (y.length === 4) return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        const [a, b, y] = parts;
+        if (y.length === 4) {
+          let d = parseInt(a), m = parseInt(b);
+          if (m > 12) { const tmp = d; d = m; m = tmp; } // swap: was MM/DD/YYYY american format
+          return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        }
       }
-      // Text that looks like a header (e.g. "Data de resposta") → skip
       return null;
     };
     // Skip header row if first column contains non-name text (e.g. "Candidato", "Nome")
