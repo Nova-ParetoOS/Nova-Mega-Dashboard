@@ -274,8 +274,7 @@ const CategoryDetailPanel = ({ category, items, onClose }) => {
   );
 };
 
-// ==========================================
-// 3. COMPONENTE PRINCIPAL
+// ==========================================// 3. COMPONENTE PRINCIPAL
 // ==========================================
 const App = () => {
   // --- Estados de Interface ---
@@ -706,8 +705,7 @@ const App = () => {
     );
   };
 
-  const renderViabilityTab = () => {
-    const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
+  const renderViabilityTab = () => {const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
     const goalsData = getGoalsData(selectedStore, selectedMonth);
     const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
     const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
@@ -1330,8 +1328,7 @@ const App = () => {
                   })()}
                 </div>
             </div>
-            {/* === GRÁFICO DE BARRAS: TOP 5 VENDEDORAS POR ANO === */}
-            {(() => {
+            {/* === GRÁFICO DE BARRAS: TOP 5 VENDEDORAS POR ANO === */}{(() => {
               const CHART_YEARS = [2023, 2024, 2025, new Date().getFullYear()];
               // 5 high-contrast, visually distinct colors
               const SELLER_COLORS = ['#f59e0b', '#10b981', '#e11d48', '#3b82f6', '#a855f7'];
@@ -1774,8 +1771,7 @@ const App = () => {
                 </div>
             </div>
 
-            {/* === ANNUAL PERFORMANCE TRACKING — 3 CARDS === */}
-            {(() => {
+            {/* === ANNUAL PERFORMANCE TRACKING — 3 CARDS === */}{(() => {
               const currentYear = new Date().getFullYear();
               const currentActualMonth = new Date().getMonth() + 1; // real current month
               const months = Array.from({length: 12}, (_, i) => i + 1);
