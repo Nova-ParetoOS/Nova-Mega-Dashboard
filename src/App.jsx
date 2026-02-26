@@ -2001,10 +2001,29 @@ const App = () => {
   const processHrImport = async () => {
     const lines = hrImportText.trim().split('\n').filter(Boolean);
     if (lines.length === 0) { alert('Cole os dados antes de processar'); return; }
+    // Helper: normalize date from DD/MM/YYYY or YYYY-MM-DD to YYYY-MM-DD, else null
+    const normDate = (s) => {
+      if (!s || s.trim() === '' || s.trim() === '-' || s.trim() === '—') return null;
+      const v = s.trim();
+      // Already ISO format YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+      // DD/MM/YYYY format
+      const parts = v.split('/');
+      if (parts.length === 3) {
+        const [d, m, y] = parts;
+        if (y.length === 4) return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+      }
+      // Text that looks like a header (e.g. "Data de resposta") → skip
+      return null;
+    };
+    // Skip header row if first column contains non-name text (e.g. "Candidato", "Nome")
+    const isHeader = (col0) => /^(candidato|nome|data|status|telefone|fonte)/i.test((col0 || '').trim());
     const entries = lines.map(line => {
       const col = line.split('\t');
-      return { store_code: selectedStore, candidato: col[0]?.trim() || '', telefone: col[1]?.trim() || null, recebimento_curriculo: col[2]?.trim() || null, data_resposta: col[3]?.trim() || null, status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: col[6]?.trim() || null, nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
-    }).filter(e => e.candidato);
+      const candidato = col[0]?.trim() || '';
+      if (isHeader(candidato)) return null; // skip header
+      return { store_code: selectedStore, candidato, telefone: col[1]?.trim() || null, recebimento_curriculo: normDate(col[2]), data_resposta: normDate(col[3]), status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: normDate(col[6]), nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
+    }).filter(e => e && e.candidato);
     if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
     const { error } = await supabase.from('hr_candidates').insert(entries);
     if (error) { alert('Erro: ' + error.message); return; }
@@ -2020,7 +2039,7 @@ const App = () => {
       <div className="space-y-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Sele\u00e7\u00e3o</h2><p className="text-xs text-gray-500">Gest\u00e3o de candidatos</p></div></div>
+            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Seleção</h2><p className="text-xs text-gray-500">Gestão de candidatos</p></div></div>
             <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><Upload className="w-4 h-4"/> Importar Candidatos</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
@@ -2036,7 +2055,7 @@ const App = () => {
           </div>
         </div>
         <div className="space-y-2">
-          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o bot\u00e3o acima</p></div>)}
+          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o botão acima</p></div>)}
           {filtered.map(cand => {
             const isOpen = hrExpanded.has(cand.id);
             const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
@@ -2047,12 +2066,12 @@ const App = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-gray-800">{cand.candidato}</span>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '\u2014'}</span>
-                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">\u2713 Interessado</span>}
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '—'}</span>
+                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">✓ Interessado</span>}
                     </div>
                     <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
                       {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
-                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Curr\u00edculo: {formatDateBR(cand.recebimento_curriculo)}</span>}
+                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Currículo: {formatDateBR(cand.recebimento_curriculo)}</span>}
                       {cand.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(cand.entrevista_agendada)}</span>}
                     </div>
                   </div>
@@ -2065,17 +2084,17 @@ const App = () => {
                 {isOpen && (
                   <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Respons\u00e1vel',value:cand.responsavel},{label:'Etapa M\u00e1xima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '\u2014').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
+                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Responsável',value:cand.responsavel},{label:'Etapa Máxima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '—').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">\u21a9 Retornou</span>}
-                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">\u2713 Interessado</span>}
-                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">\u2717 Recusa</span>}
-                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">\u26a0 Desvio</span>}
+                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
+                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">✓ Interessado</span>}
+                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
+                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
                     </div>
                     {cand.motivo_detalhes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.motivo_detalhes}</p></div>)}
-                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">\U0001f4dd Observa\u00e7\u00f5es</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
-                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">\u26a0\ufe0f Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
+                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">📝 Observações</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
+                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">⚠️ Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
                   </div>
                 )}
               </div>
