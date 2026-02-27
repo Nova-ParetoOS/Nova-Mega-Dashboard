@@ -2016,12 +2016,25 @@ const App = () => {
       }
       return null;
     };
-    // Skip header row if first column contains non-name text (e.g. "Candidato", "Nome")
-    const isHeader = (col0) => /^(candidato|nome|data|status|telefone|fonte)/i.test((col0 || '').trim());
-    const entries = lines.map(line => {
+    // Detect if a line is a valid candidate row:
+    // must have tabs, name not starting with [ or digit, and phone col must be numeric (8+ digits)
+    const isCandidateLine = (line) => {
+      if (!line.includes('\t')) return false;
+      const col = line.split('\t');
+      if (col.length < 3) return false;
+      const name = (col[0] || '').trim();
+      if (!name || name.length < 2) return false;
+      if (name.startsWith('[')) return false; // WhatsApp message
+      if (/^\d/.test(name)) return false; // starts with digit
+      if (/^(candidato|nome|data|status|telefone|fonte)/i.test(name)) return false; // header
+      if (['Rua ', 'Av.', 'Avenida', 'Período', 'TRUE', 'FALSE'].some(kw => name.includes(kw))) return false;
+      const phoneDigits = (col[1] || '').replace(/\D/g, '');
+      return phoneDigits.length >= 8; // must have valid phone
+    };
+    const entries = lines.filter(isCandidateLine).map(line => {
       const col = line.split('\t');
       const candidato = col[0]?.trim() || '';
-      if (isHeader(candidato)) return null; // skip header
+      if (!candidato) return null;
       return { store_code: selectedStore, candidato, telefone: col[1]?.trim() || null, recebimento_curriculo: normDate(col[2]), data_resposta: normDate(col[3]), status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: normDate(col[6]), nota_interna: col[9]?.trim() || null, fonte_captacao: col[10]?.trim() || null, observacoes: col[11]?.trim() || null, retornou: col[12]?.trim()?.toUpperCase() === 'TRUE', interessado: col[13]?.trim()?.toUpperCase() === 'TRUE', recusa: col[14]?.trim()?.toUpperCase() === 'TRUE', desvio: col[15]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[16]?.trim() || null, whatsapp: col[17]?.trim() || null, etapa_maxima: col[20]?.trim() || null, macro_status_final: col[21]?.trim() || null, gargalo: col[22]?.trim() || null };
     }).filter(e => e && e.candidato);
     if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
