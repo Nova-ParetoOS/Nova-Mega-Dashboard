@@ -274,7 +274,8 @@ const CategoryDetailPanel = ({ category, items, onClose }) => {
   );
 };
 
-// ==========================================// 3. COMPONENTE PRINCIPAL
+// ==========================================
+// 3. COMPONENTE PRINCIPAL
 // ==========================================
 const App = () => {
   // --- Estados de Interface ---
@@ -705,7 +706,8 @@ const App = () => {
                  <div key={group}>
                      <div className="text-xs font-bold text-gray-500 uppercase mt-2 mb-1 px-1">{group}</div>
                      {groupItems.map(i => {
-                       const sizesWithDiff = sizeColumns.filter(s => i.diffSizes[s] !== undefined && i.diffSizes[s] !== 0);return (
+                       const sizesWithDiff = sizeColumns.filter(s => i.diffSizes[s] !== undefined && i.diffSizes[s] !== 0);
+                       return (
                          <div key={i.id} className="text-sm flex justify-between border-b p-1 last:border-0 hover:bg-white/50 transition-colors">
                              <span className="font-medium">{i.REFERENCIA} <span className="text-xs text-gray-400">({i.COR1DESC})</span></span>
                              <div className="flex gap-2">
@@ -1328,7 +1330,8 @@ const App = () => {
                       return (
                         <div key={i} className="absolute" style={{left: `${xPct}%`, top: `${yPct}%`, transform: 'translate(-50%, -50%)'}}>
                           {/* Outer glow ring */}
-                          <div className="absolute rounded-full" style={{width:24, height:24, background: color, opacity:0.15, top:-8, left:-8}}/>{/* Dot */}
+                          <div className="absolute rounded-full" style={{width:24, height:24, background: color, opacity:0.15, top:-8, left:-8}}/>
+                          {/* Dot */}
                           <div className="rounded-full border-2 border-white shadow-lg" style={{width:10, height:10, background: hasSales ? color : '#4b5563', boxShadow: hasSales ? `0 0 10px ${color}88` : 'none'}}/>
                           {/* Value label */}
                           {hasSales && (
@@ -1771,7 +1774,8 @@ const App = () => {
                                                           </div>
                                                         );
                                                       })}
-                                                    </div></div>
+                                                    </div>
+                                                  </div>
                                                 );
                                               })}
                                             </div>
