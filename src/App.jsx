@@ -316,6 +316,14 @@ const App = () => {
   const [dbLoading, setDbLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [userStoreAccess, setUserStoreAccess] = useState([]);
+  const [session, setSession] = useState(undefined); // undefined=loading, null=logged out
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const [hrCandidates, setHrCandidates] = useState([]);
   const [hrFilter, setHrFilter] = useState('all');
   const [hrSearch, setHrSearch] = useState('');
@@ -356,7 +364,20 @@ const App = () => {
   const loadSellerOverrides = async () => { const { data } = await supabase.from('seller_overrides').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); } };
   const loadHrCandidates = async () => { const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false }); if (data) setHrCandidates(data); };
 
-  useEffect(() => { loadAllData(); }, []);
+  useEffect(() => {
+    // Listen for auth state changes
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) loadAllData();
+      else setDbLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (s) loadAllData();
+      else { setDbLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const loadStoreData = async () => {
     await Promise.all([loadSystemData(), loadAuditData(), loadMarketingStatus(), loadCompletedIds(), loadSellerOverrides()]);
@@ -684,8 +705,7 @@ const App = () => {
                  <div key={group}>
                      <div className="text-xs font-bold text-gray-500 uppercase mt-2 mb-1 px-1">{group}</div>
                      {groupItems.map(i => {
-                       const sizesWithDiff = sizeColumns.filter(s => i.diffSizes[s] !== undefined && i.diffSizes[s] !== 0);
-                       return (
+                       const sizesWithDiff = sizeColumns.filter(s => i.diffSizes[s] !== undefined && i.diffSizes[s] !== 0);return (
                          <div key={i.id} className="text-sm flex justify-between border-b p-1 last:border-0 hover:bg-white/50 transition-colors">
                              <span className="font-medium">{i.REFERENCIA} <span className="text-xs text-gray-400">({i.COR1DESC})</span></span>
                              <div className="flex gap-2">
@@ -705,7 +725,8 @@ const App = () => {
     );
   };
 
-  const renderViabilityTab = () => {const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
+  const renderViabilityTab = () => {
+    const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
     const goalsData = getGoalsData(selectedStore, selectedMonth);
     const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
     const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
@@ -1307,8 +1328,7 @@ const App = () => {
                       return (
                         <div key={i} className="absolute" style={{left: `${xPct}%`, top: `${yPct}%`, transform: 'translate(-50%, -50%)'}}>
                           {/* Outer glow ring */}
-                          <div className="absolute rounded-full" style={{width:24, height:24, background: color, opacity:0.15, top:-8, left:-8}}/>
-                          {/* Dot */}
+                          <div className="absolute rounded-full" style={{width:24, height:24, background: color, opacity:0.15, top:-8, left:-8}}/>{/* Dot */}
                           <div className="rounded-full border-2 border-white shadow-lg" style={{width:10, height:10, background: hasSales ? color : '#4b5563', boxShadow: hasSales ? `0 0 10px ${color}88` : 'none'}}/>
                           {/* Value label */}
                           {hasSales && (
@@ -1328,7 +1348,8 @@ const App = () => {
                   })()}
                 </div>
             </div>
-            {/* === GRÁFICO DE BARRAS: TOP 5 VENDEDORAS POR ANO === */}{(() => {
+            {/* === GRÁFICO DE BARRAS: TOP 5 VENDEDORAS POR ANO === */}
+            {(() => {
               const CHART_YEARS = [2023, 2024, 2025, new Date().getFullYear()];
               // 5 high-contrast, visually distinct colors
               const SELLER_COLORS = ['#f59e0b', '#10b981', '#e11d48', '#3b82f6', '#a855f7'];
@@ -1750,8 +1771,7 @@ const App = () => {
                                                           </div>
                                                         );
                                                       })}
-                                                    </div>
-                                                  </div>
+                                                    </div></div>
                                                 );
                                               })}
                                             </div>
@@ -1771,7 +1791,8 @@ const App = () => {
                 </div>
             </div>
 
-            {/* === ANNUAL PERFORMANCE TRACKING — 3 CARDS === */}{(() => {
+            {/* === ANNUAL PERFORMANCE TRACKING — 3 CARDS === */}
+            {(() => {
               const currentYear = new Date().getFullYear();
               const currentActualMonth = new Date().getMonth() + 1; // real current month
               const months = Array.from({length: 12}, (_, i) => i + 1);
@@ -1981,7 +2002,185 @@ const App = () => {
     );
   };
 
-  if (dbLoading) return (<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900"><div className="text-center"><div className="text-white text-xl font-bold animate-pulse mb-2">Carregando dados...</div><div className="text-indigo-300 text-sm">Conectando ao banco de dados</div></div></div>);
+  // ── AUTH HANDLERS ─────────────────────────────────────────
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError(''); setLoginLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    if (error) setLoginError(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message);
+    setLoginLoading(false);
+  };
+  const handleGoogleLogin = async () => {
+    setLoginLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    if (error) { setLoginError(error.message); setLoginLoading(false); }
+  };
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo: `${window.location.origin}?reset=true` });
+    if (!error) setForgotSent(true);
+    else setLoginError(error.message);
+    setLoginLoading(false);
+  };
+
+  // Session still loading
+  if (session === undefined) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
+        <div className="text-white text-lg font-bold">Verificando sessão...</div>
+      </div>
+    </div>
+  );
+
+  // Not logged in → show login screen
+  if (!session) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"/>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl"/>
+      </div>
+
+      <div className="relative w-full max-w-md">
+        {/* Logo / Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-2xl mb-4">
+            <Package className="w-8 h-8 text-white"/>
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tight">Nova OS</h1>
+          <p className="text-indigo-300 text-sm mt-1">Sistema de Gestão de Lojas</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8">
+          {!showForgot ? (
+            <>
+              <h2 className="text-xl font-bold text-white mb-6">Entrar na sua conta</h2>
+
+              {/* Google Button */}
+              <button onClick={handleGoogleLogin} disabled={loginLoading}
+                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all mb-6 disabled:opacity-60">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Entrar com o Google
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex-1 h-px bg-white/20"/>
+                <span className="text-white/50 text-xs font-medium">ou continue com e-mail</span>
+                <div className="flex-1 h-px bg-white/20"/>
+              </div>
+
+              {/* Email/Password form */}
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-indigo-200 mb-1.5">E-mail</label>
+                  <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required
+                    placeholder="seu@email.com"
+                    className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-indigo-200 mb-1.5">Senha</label>
+                  <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required
+                    placeholder="••••••••"
+                    className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"/>
+                </div>
+
+                {loginError && (
+                  <div className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 text-red-300 text-sm rounded-xl px-4 py-3">
+                    <AlertCircle className="w-4 h-4 shrink-0"/>
+                    {loginError}
+                  </div>
+                )}
+
+                <button type="submit" disabled={loginLoading}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                  {loginLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
+                      Entrando...
+                    </span>
+                  ) : 'Entrar'}
+                </button>
+              </form>
+
+              {/* Forgot password link */}
+              <div className="text-center mt-5">
+                <button onClick={() => { setShowForgot(true); setForgotEmail(loginEmail); setLoginError(''); }}
+                  className="text-indigo-300 hover:text-white text-sm transition-colors underline underline-offset-2">
+                  Esqueci minha senha
+                </button>
+              </div>
+            </>
+          ) : (
+            /* Forgot password screen */
+            <>
+              <button onClick={() => { setShowForgot(false); setForgotSent(false); setLoginError(''); }}
+                className="flex items-center gap-1.5 text-indigo-300 hover:text-white text-sm mb-6 transition-colors">
+                <ChevronLeft className="w-4 h-4"/> Voltar ao login
+              </button>
+
+              {!forgotSent ? (
+                <>
+                  <h2 className="text-xl font-bold text-white mb-2">Recuperar senha</h2>
+                  <p className="text-indigo-300 text-sm mb-6">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-indigo-200 mb-1.5">E-mail</label>
+                      <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required
+                        placeholder="seu@email.com"
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all"/>
+                    </div>
+                    {loginError && (
+                      <div className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 text-red-300 text-sm rounded-xl px-4 py-3">
+                        <AlertCircle className="w-4 h-4 shrink-0"/> {loginError}
+                      </div>
+                    )}
+                    <button type="submit" disabled={loginLoading}
+                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all disabled:opacity-60">
+                      {loginLoading ? 'Enviando...' : 'Enviar link de recuperação'}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-8 h-8 text-green-400"/>
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-2">E-mail enviado!</h2>
+                  <p className="text-indigo-300 text-sm">Verifique sua caixa de entrada em <span className="text-white font-medium">{forgotEmail}</span> e clique no link para redefinir sua senha.</p>
+                  <button onClick={() => { setShowForgot(false); setForgotSent(false); }}
+                    className="mt-6 text-indigo-300 hover:text-white text-sm underline underline-offset-2 transition-colors">
+                    Voltar ao login
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <p className="text-center text-white/30 text-xs mt-6">© {new Date().getFullYear()} Nova ParetoOS · Todos os direitos reservados</p>
+      </div>
+    </div>
+  );
+
+  // Still loading app data after login
+  if (dbLoading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
+        <div className="text-white text-xl font-bold mb-2">Carregando dados...</div>
+        <div className="text-indigo-300 text-sm">Conectando ao banco de dados</div>
+      </div>
+    </div>
+  );
 
   // ── RH TAB ────────────────────────────────────────────────
   const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
@@ -2035,7 +2234,33 @@ const App = () => {
       const col = line.split('\t');
       const candidato = col[0]?.trim() || '';
       if (!candidato) return null;
-      return { store_code: selectedStore, candidato, telefone: col[1]?.trim() || null, recebimento_curriculo: normDate(col[2]), data_resposta: normDate(col[3]), status_processo: col[4]?.trim() || null, motivo_detalhes: col[5]?.trim() || null, entrevista_agendada: normDate(col[6]), nota_interna: col[12]?.trim() || null, fonte_captacao: col[13]?.trim() || null, observacoes: col[14]?.trim() || null, retornou: col[16]?.trim()?.toUpperCase() === 'TRUE', interessado: col[17]?.trim()?.toUpperCase() === 'TRUE', recusa: col[18]?.trim()?.toUpperCase() === 'TRUE', desvio: col[19]?.trim()?.toUpperCase() === 'TRUE', responsavel: col[20]?.trim() || null, whatsapp: col[21]?.trim() || null, etapa_maxima: col[24]?.trim() || null, macro_status_final: col[25]?.trim() || null, gargalo: col[26]?.trim() || null };
+      (() => {
+        // Responsável: col[19] se não for boolean, senão col[20]
+        const col19 = col[19]?.trim() || '';
+        const col19IsBool = col19.toUpperCase() === 'TRUE' || col19.toUpperCase() === 'FALSE';
+        const responsavel = col19IsBool ? (col[20]?.trim() || null) : (col19 || col[20]?.trim() || null);
+        const whatsappOffset = col19IsBool ? 0 : 0; // always col[21]
+        return { store_code: selectedStore, candidato,
+          telefone: col[1]?.trim() || null,
+          recebimento_curriculo: normDate(col[2]),
+          data_resposta: normDate(col[3]),
+          status_processo: col[4]?.trim() || null,
+          motivo_detalhes: col[5]?.trim() || null,
+          entrevista_agendada: normDate(col[6]),
+          nota_interna: col[12]?.trim() || null,
+          fonte_captacao: col[13]?.trim() || null,
+          observacoes: col[14]?.trim() || null,
+          retornou: col[16]?.trim()?.toUpperCase() === 'TRUE',
+          interessado: col[17]?.trim()?.toUpperCase() === 'TRUE',
+          recusa: col[18]?.trim()?.toUpperCase() === 'TRUE',
+          desvio: col19IsBool && col19.toUpperCase() === 'TRUE',
+          responsavel,
+          whatsapp: col[21]?.trim() || null,
+          etapa_maxima: col[25]?.trim() || null,
+          macro_status_final: col[26]?.trim() || null,
+          gargalo: col[27]?.trim() || null,
+        };
+      })()
     }).filter(e => e && e.candidato);
     if (entries.length === 0) { alert('Nenhum candidato encontrado'); return; }
     const { error } = await supabase.from('hr_candidates').insert(entries);
