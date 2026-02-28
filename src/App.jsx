@@ -334,6 +334,7 @@ const App = () => {
   const [dreValues, setDreValues] = useState(() => {
     try { return JSON.parse(localStorage.getItem('stock_dreValues')) || {}; } catch { return {}; }
   });
+  const [dreScenario, setDreScenario] = useState('base'); // 'base' | 'otimista' | 'pessimista'
   // Goals tab: manual seller count override for quick scenario testing
   const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
   // Goals tab: selected seller names for chip-based count
@@ -789,56 +790,133 @@ const App = () => {
     const goalsData = getGoalsData(selectedStore, selectedMonth);
     const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
     const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
-    const dreKey = `${selectedStore}-${selectedMonth}-${selectedYear}`;
+
+    const dreKeyBase = `${selectedStore}-${selectedMonth}-${selectedYear}-base`;
+    const dreKey = `${selectedStore}-${selectedMonth}-${selectedYear}-${dreScenario}`;
+    const savedDreBase = dreValues[dreKeyBase] || {};
     const savedDre = dreValues[dreKey] || {};
+
+    const resolveField = (field, configDefault) => {
+      if (dreScenario === 'base') return savedDre[field] ?? configDefault;
+      return savedDre[field] ?? savedDreBase[field] ?? configDefault;
+    };
+
     const updateDreValue = (field, value) => {
       setDreValues(prev => ({ ...prev, [dreKey]: { ...prev[dreKey], [field]: parseFloat(value) || 0 } }));
     };
-    const receitaBruta = totalSalesMonth;
-    const percCMV = savedDre.percCMV ?? finData.config.variableCosts.cmv;
-    const percImpostos = savedDre.percImpostos ?? finData.config.variableCosts.imposto;
-    const percTaxasCartao = savedDre.percTaxasCartao ?? finData.config.variableCosts.taxaCartao;
-    const percEmbalagens = savedDre.percEmbalagens ?? finData.config.variableCosts.embalagem;
-    const percObsolescencia = savedDre.percObsolescencia ?? finData.config.variableCosts.obsoleto;
-    const cmv = receitaBruta * (percCMV / 100);
-    const lucroBruto = receitaBruta - cmv;
-    const margemBruta = receitaBruta > 0 ? (lucroBruto / receitaBruta) * 100 : 0;
-    const impostos = receitaBruta * (percImpostos / 100);
-    const taxasCartao = receitaBruta * (percTaxasCartao / 100);
-    const embalagens = receitaBruta * (percEmbalagens / 100);
-    const obsolescencia = receitaBruta * (percObsolescencia / 100);
-    const deducoesReceita = impostos + taxasCartao + embalagens + obsolescencia;
-    const receitaLiquida = lucroBruto - deducoesReceita;
-    const margemLiquida = receitaBruta > 0 ? (receitaLiquida / receitaBruta) * 100 : 0;
-    const aluguel = savedDre.aluguel ?? finData.config.fixedCosts.aluguel;
-    const proLabore = savedDre.proLabore ?? finData.config.fixedCosts.proLabore;
-    const agua = savedDre.agua ?? finData.config.fixedCosts.agua;
-    const luz = savedDre.luz ?? finData.config.fixedCosts.luz;
-    const internet = savedDre.internet ?? finData.config.fixedCosts.internet;
-    const software = savedDre.software ?? finData.config.fixedCosts.software;
-    const contabilidade = savedDre.contabilidade ?? finData.config.fixedCosts.contabilidade;
-    const salarios = savedDre.salarios ?? finData.config.fixedCosts.colaboradoras;
-    const administracao = savedDre.administracao ?? finData.config.fixedCosts.adm;
-    const alimentacao = savedDre.alimentacao ?? finData.config.fixedCosts.alimentacao;
-    const transporte = savedDre.transporte ?? finData.config.fixedCosts.transporte;
-    const totalDespesasFixas = aluguel + proLabore + agua + luz + internet + software + contabilidade + salarios + administracao + alimentacao + transporte;
-    const resultadoOperacional = receitaLiquida - totalDespesasFixas;
-    const margemOperacional = receitaBruta > 0 ? (resultadoOperacional / receitaBruta) * 100 : 0;
-    const breakEvenDiff = receitaBruta - finData.breakEven;
-    const breakEvenPercent = finData.breakEven > 0 ? (breakEvenDiff / finData.breakEven) * 100 : 0;
-    const metaLojaDiff = receitaBruta - goalsData.metaConservadora;
-    const metaLojaPercent = goalsData.metaConservadora > 0 ? (metaLojaDiff / goalsData.metaConservadora) * 100 : 0;
+
+    const receitaBrutaBase = totalSalesMonth;
+    const receitaBrutaEdit = dreScenario !== 'base' ? (savedDre.receitaBruta ?? savedDreBase.receitaBruta ?? receitaBrutaBase) : receitaBrutaBase;
+    const receitaBruta = dreScenario === 'base' ? receitaBrutaBase : receitaBrutaEdit;
+
+    const percCMV           = resolveField('percCMV',           finData.config.variableCosts.cmv);
+    const percImpostos      = resolveField('percImpostos',      finData.config.variableCosts.imposto);
+    const percTaxasCartao   = resolveField('percTaxasCartao',   finData.config.variableCosts.taxaCartao);
+    const percEmbalagens    = resolveField('percEmbalagens',    finData.config.variableCosts.embalagem);
+    const percObsolescencia = resolveField('percObsolescencia', finData.config.variableCosts.obsoleto);
+    const cmv               = receitaBruta * (percCMV / 100);
+    const lucroBruto        = receitaBruta - cmv;
+    const margemBruta       = receitaBruta > 0 ? (lucroBruto / receitaBruta) * 100 : 0;
+    const impostos          = receitaBruta * (percImpostos / 100);
+    const taxasCartao       = receitaBruta * (percTaxasCartao / 100);
+    const embalagens        = receitaBruta * (percEmbalagens / 100);
+    const obsolescencia     = receitaBruta * (percObsolescencia / 100);
+    const deducoesReceita   = impostos + taxasCartao + embalagens + obsolescencia;
+    const receitaLiquida    = lucroBruto - deducoesReceita;
+    const margemLiquida     = receitaBruta > 0 ? (receitaLiquida / receitaBruta) * 100 : 0;
+    const aluguel           = resolveField('aluguel',       finData.config.fixedCosts.aluguel);
+    const proLabore         = resolveField('proLabore',     finData.config.fixedCosts.proLabore);
+    const agua              = resolveField('agua',          finData.config.fixedCosts.agua);
+    const luz               = resolveField('luz',           finData.config.fixedCosts.luz);
+    const internet          = resolveField('internet',      finData.config.fixedCosts.internet);
+    const software          = resolveField('software',      finData.config.fixedCosts.software);
+    const contabilidade     = resolveField('contabilidade', finData.config.fixedCosts.contabilidade);
+    const salarios          = resolveField('salarios',      finData.config.fixedCosts.colaboradoras);
+    const administracao     = resolveField('administracao', finData.config.fixedCosts.adm);
+    const alimentacao       = resolveField('alimentacao',   finData.config.fixedCosts.alimentacao);
+    const transporte        = resolveField('transporte',    finData.config.fixedCosts.transporte);
+    const totalDespesasFixas    = aluguel + proLabore + agua + luz + internet + software + contabilidade + salarios + administracao + alimentacao + transporte;
+    const resultadoOperacional  = receitaLiquida - totalDespesasFixas;
+    const margemOperacional     = receitaBruta > 0 ? (resultadoOperacional / receitaBruta) * 100 : 0;
+    const breakEvenDiff         = receitaBruta - finData.breakEven;
+    const breakEvenPercent      = finData.breakEven > 0 ? (breakEvenDiff / finData.breakEven) * 100 : 0;
+    const metaLojaDiff          = receitaBruta - goalsData.metaConservadora;
+    const metaLojaPercent       = goalsData.metaConservadora > 0 ? (metaLojaDiff / goalsData.metaConservadora) * 100 : 0;
+
+    const computeScenario = (sc) => {
+      const keyB = `${selectedStore}-${selectedMonth}-${selectedYear}-base`;
+      const keyS = `${selectedStore}-${selectedMonth}-${selectedYear}-${sc}`;
+      const base = dreValues[keyB] || {};
+      const sv   = dreValues[keyS] || {};
+      const res  = (field, def) => sc === 'base' ? (sv[field] ?? def) : (sv[field] ?? base[field] ?? def);
+      const rb   = sc === 'base' ? totalSalesMonth : (sv.receitaBruta ?? base.receitaBruta ?? totalSalesMonth);
+      const cmvP = res('percCMV', finData.config.variableCosts.cmv);
+      const lb   = rb - rb * (cmvP / 100);
+      const ded  = rb * ((res('percImpostos', finData.config.variableCosts.imposto) + res('percTaxasCartao', finData.config.variableCosts.taxaCartao) + res('percEmbalagens', finData.config.variableCosts.embalagem) + res('percObsolescencia', finData.config.variableCosts.obsoleto)) / 100);
+      const rl   = lb - ded;
+      const df   = res('aluguel', finData.config.fixedCosts.aluguel) + res('proLabore', finData.config.fixedCosts.proLabore) + res('agua', finData.config.fixedCosts.agua) + res('luz', finData.config.fixedCosts.luz) + res('internet', finData.config.fixedCosts.internet) + res('software', finData.config.fixedCosts.software) + res('contabilidade', finData.config.fixedCosts.contabilidade) + res('salarios', finData.config.fixedCosts.colaboradoras) + res('administracao', finData.config.fixedCosts.adm) + res('alimentacao', finData.config.fixedCosts.alimentacao) + res('transporte', finData.config.fixedCosts.transporte);
+      const ro   = rl - df;
+      return { rb, lb, rl, df, ro, mg: rb > 0 ? (ro / rb) * 100 : 0 };
+    };
+    const sc = { base: computeScenario('base'), otimista: computeScenario('otimista'), pessimista: computeScenario('pessimista') };
+
+    const SCENARIOS = [
+      { id: 'base',       label: '📊 Base',       color: 'emerald', description: 'Valores reais da loja' },
+      { id: 'otimista',   label: '🚀 Otimista',   color: 'blue',    description: 'Herda base, ajuste positivo' },
+      { id: 'pessimista', label: '⚠️ Pessimista', color: 'orange',  description: 'Herda base, ajuste conservador' },
+    ];
 
     return (
       <div className="space-y-6">
           <div className="bg-gradient-to-br from-white to-emerald-50/30 p-6 rounded-2xl border border-emerald-100 shadow-lg no-print">
             <h2 className="text-2xl font-bold text-emerald-800 flex items-center gap-2 mb-4"><PieChart className="w-6 h-6"/> DRE - Demonstração do Resultado do Exercício</h2>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3 mb-5">
                <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Object.entries(STORE_CONFIGS).map(([k,v]) => <option key={k} value={k}>{v.name}</option>)}</select>
                <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{getMonthName(i+1)}</option>)}</select>
                <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:5},(_,i)=><option key={i} value={2023+i}>{2023+i}</option>)}</select>
             </div>
+            <div className="flex flex-wrap gap-3">
+              {SCENARIOS.map(({ id, label, color, description }) => (
+                <button key={id} onClick={() => setDreScenario(id)}
+                  className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all text-sm font-medium ${
+                    dreScenario === id
+                      ? `bg-${color}-600 text-white border-${color}-600 shadow-md scale-[1.03]`
+                      : `bg-white text-gray-700 border-gray-200 hover:border-${color}-300 hover:bg-${color}-50`
+                  }`}>
+                  <span className="font-bold">{label}</span>
+                  <span className={`text-xs mt-0.5 ${dreScenario === id ? 'opacity-80' : 'text-gray-400'}`}>{description}</span>
+                </button>
+              ))}
+              {dreScenario !== 'base' && (
+                <button onClick={() => { if (window.confirm('Limpar alterações deste cenário?')) setDreValues(prev => { const n = {...prev}; delete n[dreKey]; return n; }); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-sm hover:bg-red-50 transition-all self-center">
+                  <X className="w-4 h-4"/> Resetar cenário
+                </button>
+              )}
+            </div>
           </div>
+
+          {dreScenario !== 'base' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <div className="font-bold text-blue-900">Receita Bruta — Simulação</div>
+                  <div className="text-xs text-blue-600 mt-1">Cenário base: {formatCurrency(receitaBrutaBase)} (vendas reais)</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="number" step="100" value={receitaBrutaEdit}
+                    onChange={e => updateDreValue('receitaBruta', e.target.value)}
+                    className="w-36 border-2 border-blue-300 rounded-xl px-3 py-2 text-right font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-400 focus:outline-none text-lg"/>
+                  <span className="text-blue-600 text-sm font-medium">
+                    {receitaBrutaEdit !== receitaBrutaBase
+                      ? `${receitaBrutaEdit > receitaBrutaBase ? '+' : ''}${(((receitaBrutaEdit - receitaBrutaBase) / receitaBrutaBase) * 100).toFixed(1)}% vs base`
+                      : 'Igual ao base'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className={`p-6 rounded-2xl text-white shadow-xl ${resultadoOperacional >= 0 ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-700' : 'bg-gradient-to-br from-red-500 via-red-600 to-red-800'}`}>
                 <h3 className="text-sm opacity-90 font-medium">Resultado Operacional</h3>
@@ -865,40 +943,62 @@ const App = () => {
                 </div>
              </div>
           </div>
+
           <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-lg">
               <div className="space-y-4">
                   <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-md">
                       <div className="flex justify-between items-center"><span className="font-bold text-lg">1. Receita Bruta de Vendas</span><span className="font-bold text-3xl">{formatCurrency(receitaBruta)}</span></div>
+                      {dreScenario === 'base' && <div className="text-xs opacity-75 mt-1">Fonte: vendas reais do período importadas</div>}
                   </div>
                   <div className="ml-6 bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
                       <div className="flex justify-between items-center mb-2"><span className="font-semibold text-red-900">(-) Custo da Mercadoria Vendida (CMV)</span><span className="font-bold text-xl text-red-900">{formatCurrency(cmv)}</span></div>
                       <div className="flex items-center gap-2 text-sm"><span className="text-red-700">Percentual:</span><input type="number" step="0.01" value={percCMV} onChange={e => updateDreValue('percCMV', e.target.value)} className="w-20 border border-red-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-red-400"/><span className="text-red-700">%</span></div>
                   </div>
                   <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-5 rounded-xl shadow-md">
-                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">2. Lucro Bruto</div><div className="text-sm opacity-90">Margem: {margemBruta.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(lucroBruto)}</span></div>
+                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">2. Lucro Bruto</div><div className="text-sm opacity-90">= Receita Bruta − CMV · Margem: {margemBruta.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(lucroBruto)}</span></div>
                   </div>
                   <div className="ml-6 space-y-3">
-                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Deduções da Receita:</div>
+                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Deduções sobre a Receita:</div>
                       <div className="grid grid-cols-2 gap-4">
-                          {[['Impostos','percImpostos',impostos,'orange'],['Taxas Cartão','percTaxasCartao',taxasCartao,'orange'],['Embalagens','percEmbalagens',embalagens,'orange'],['Obsolescência','percObsolescencia',obsolescencia,'orange']].map(([label, field, val]) => (
+                          {[
+                            ['Impostos',      'percImpostos',      impostos,      finData.config.variableCosts.imposto],
+                            ['Taxas Cartão',  'percTaxasCartao',   taxasCartao,   finData.config.variableCosts.taxaCartao],
+                            ['Embalagens',    'percEmbalagens',    embalagens,    finData.config.variableCosts.embalagem],
+                            ['Obsolescência', 'percObsolescencia', obsolescencia, finData.config.variableCosts.obsoleto],
+                          ].map(([label, field, val, defaultVal]) => (
                             <div key={field} className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                                 <div className="flex justify-between items-center mb-2"><span className="text-sm font-semibold text-orange-900">{label}</span><span className="font-bold text-orange-900">{formatCurrency(val)}</span></div>
-                                <div className="flex items-center gap-2 text-xs"><input type="number" step="0.01" value={savedDre[field] ?? finData.config.variableCosts[field === 'percImpostos' ? 'imposto' : field === 'percTaxasCartao' ? 'taxaCartao' : field === 'percEmbalagens' ? 'embalagem' : 'obsoleto']} onChange={e => updateDreValue(field, e.target.value)} className="w-16 border border-orange-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-orange-400"/><span className="text-orange-700">%</span></div>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <input type="number" step="0.01" value={resolveField(field, defaultVal)} onChange={e => updateDreValue(field, e.target.value)} className="w-16 border border-orange-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-orange-400"/>
+                                  <span className="text-orange-700">%</span>
+                                </div>
                             </div>
                           ))}
                       </div>
                       <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg border border-orange-300"><span className="font-bold text-orange-900">Total Deduções</span><span className="font-bold text-xl text-orange-900">{formatCurrency(deducoesReceita)}</span></div>
                   </div>
                   <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-5 rounded-xl shadow-md">
-                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">3. Receita Líquida</div><div className="text-sm opacity-90">Margem: {margemLiquida.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(receitaLiquida)}</span></div>
+                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">3. Receita Líquida</div><div className="text-sm opacity-90">= Lucro Bruto − Deduções · Margem: {margemLiquida.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(receitaLiquida)}</span></div>
                   </div>
                   <div className="ml-6 space-y-3">
-                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Despesas Operacionais:</div>
+                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Despesas Operacionais Fixas:</div>
                       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                          {[['Aluguel','aluguel',aluguel],['Pró-labore','proLabore',proLabore],['Salários + Encargos','salarios',salarios],['Água','agua',agua],['Luz','luz',luz],['Internet','internet',internet],['Software','software',software],['Contabilidade','contabilidade',contabilidade],['Administração','administracao',administracao],['Alimentação','alimentacao',alimentacao],['Transporte','transporte',transporte]].map(([label, field, val]) => (
+                          {[
+                            ['Aluguel',             'aluguel',       aluguel,       finData.config.fixedCosts.aluguel],
+                            ['Pró-labore',          'proLabore',     proLabore,     finData.config.fixedCosts.proLabore],
+                            ['Salários + Encargos', 'salarios',      salarios,      finData.config.fixedCosts.colaboradoras],
+                            ['Água',                'agua',          agua,          finData.config.fixedCosts.agua],
+                            ['Luz',                 'luz',           luz,           finData.config.fixedCosts.luz],
+                            ['Internet',            'internet',      internet,      finData.config.fixedCosts.internet],
+                            ['Software',            'software',      software,      finData.config.fixedCosts.software],
+                            ['Contabilidade',       'contabilidade', contabilidade, finData.config.fixedCosts.contabilidade],
+                            ['Administração',       'administracao', administracao, finData.config.fixedCosts.adm],
+                            ['Alimentação',         'alimentacao',   alimentacao,   finData.config.fixedCosts.alimentacao],
+                            ['Transporte',          'transporte',    transporte,    finData.config.fixedCosts.transporte],
+                          ].map(([label, field, val, defaultVal]) => (
                             <div key={field} className="bg-purple-50 p-3 rounded-lg border border-purple-200">
                                 <div className="text-xs text-purple-700 mb-1">{label}</div>
-                                <input type="number" step="0.01" value={val} onChange={e => updateDreValue(field, e.target.value)} className="w-full border border-purple-300 rounded px-2 py-1.5 font-mono font-bold text-purple-900 focus:ring-2 focus:ring-purple-400"/>
+                                <input type="number" step="0.01" value={resolveField(field, defaultVal)} onChange={e => updateDreValue(field, e.target.value)} className="w-full border border-purple-300 rounded px-2 py-1.5 font-mono font-bold text-purple-900 focus:ring-2 focus:ring-purple-400"/>
                             </div>
                           ))}
                       </div>
@@ -906,7 +1006,7 @@ const App = () => {
                   </div>
                   <div className={`p-6 rounded-xl shadow-xl border-4 ${resultadoOperacional >= 0 ? 'bg-gradient-to-r from-emerald-600 to-green-700 border-emerald-400' : 'bg-gradient-to-r from-red-600 to-red-800 border-red-400'} text-white`}>
                       <div className="flex justify-between items-center">
-                          <div><div className="text-xl font-bold mb-1">4. {resultadoOperacional >= 0 ? 'LUCRO' : 'PREJUÍZO'} OPERACIONAL</div><div className="text-sm opacity-90">Margem Operacional: {margemOperacional.toFixed(2)}%</div></div>
+                          <div><div className="text-xl font-bold mb-1">4. {resultadoOperacional >= 0 ? 'LUCRO' : 'PREJUÍZO'} OPERACIONAL</div><div className="text-sm opacity-90">= Receita Líquida − Despesas Fixas · Margem: {margemOperacional.toFixed(2)}%</div></div>
                           <span className="font-bold text-5xl">{formatCurrency(Math.abs(resultadoOperacional))}</span>
                       </div>
                   </div>
@@ -922,6 +1022,51 @@ const App = () => {
                       </div>
                   </div>
               </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+            <h3 className="font-bold text-gray-800 text-lg mb-5 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-emerald-600"/> Comparativo de Cenários</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left py-3 pr-4 text-gray-600 font-semibold">Indicador</th>
+                    <th className="text-right py-3 px-4 text-emerald-700 font-bold">📊 Base</th>
+                    <th className="text-right py-3 px-4 text-blue-700 font-bold">🚀 Otimista</th>
+                    <th className="text-right py-3 px-4 text-orange-700 font-bold">⚠️ Pessimista</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[
+                    ['Receita Bruta',     s => s.rb, 'currency'],
+                    ['Lucro Bruto',       s => s.lb, 'currency'],
+                    ['Receita Líquida',   s => s.rl, 'currency'],
+                    ['Despesas Fixas',    s => s.df, 'currency'],
+                    ['Resultado Operac.', s => s.ro, 'currency'],
+                    ['Margem Operacional',s => s.mg, 'percent'],
+                  ].map(([label, fn, fmt]) => {
+                    const vals = { base: fn(sc.base), otimista: fn(sc.otimista), pessimista: fn(sc.pessimista) };
+                    return (
+                      <tr key={label} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-gray-700 font-medium">{label}</td>
+                        {['base','otimista','pessimista'].map(sid => {
+                          const v = vals[sid];
+                          const isActive = sid === dreScenario;
+                          const isNeg = v < 0;
+                          return (
+                            <td key={sid} className={`text-right py-3 px-4 font-mono font-bold rounded transition-all ${
+                              isActive ? 'bg-emerald-50' : ''
+                            } ${isNeg ? 'text-red-600' : sid === 'otimista' ? 'text-blue-700' : sid === 'pessimista' ? 'text-orange-700' : 'text-emerald-700'}`}>
+                              {fmt === 'currency' ? formatCurrency(v) : `${v.toFixed(1)}%`}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
       </div>
     );
