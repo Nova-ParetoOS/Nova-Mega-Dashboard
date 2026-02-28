@@ -288,6 +288,7 @@ const App = () => {
   const [printMode, setPrintMode] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [marketingSort, setMarketingSort] = useState('recent');
+  const [marketingStore, setMarketingStore] = useState('all'); // 'all' ou código de loja
 
   // --- Estados Dashboard Filtros ---
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -713,13 +714,25 @@ const App = () => {
   };
 
   const marketingItems = useMemo(() => {
-    let filtered = auditData.filter(item => {
+    // Filtro por loja: igual ao dashboard
+    const storeFiltered = (() => {
+      if (marketingStore === 'all') return auditData;
+      const hasStoreCodes = auditData.some(i => i.store_code || i.storeCode);
+      if (!hasStoreCodes) return auditData;
+      return auditData.filter(i => (i.store_code || i.storeCode) === marketingStore);
+    })();
+
+    let filtered = storeFiltered.filter(item => {
       const stock = calculateTotal(item.sizes);
-      const matchesSearch = (item.REFERENCIA || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = !searchTerm ||
+        (item.REFERENCIA || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.TIPODESC || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.MARCADESC || "").toLowerCase().includes(searchTerm.toLowerCase());
       const key = getItemKey(item);
       const mStatus = marketingStatus[key] || {};
+      if (marketingSort === 'archived') return !!mStatus.discontinued && matchesSearch;
+      if (mStatus.discontinued) return false; // ocultar arquivados nas outras views
       if (marketingSort === 'cleanup') return stock === 0 && mStatus.catalog && matchesSearch;
-      if (mStatus.discontinued && marketingSort !== 'cleanup') return false;
       if (marketingSort === 'no-photo') return stock > 0 && !mStatus.photo && matchesSearch;
       if (marketingSort === 'no-catalog') return stock > 0 && mStatus.photo && !mStatus.catalog && matchesSearch;
       if (marketingSort === 'to-post') return stock > 0 && mStatus.photo && mStatus.catalog && !mStatus.posted && matchesSearch;
@@ -730,7 +743,7 @@ const App = () => {
       if (marketingSort === 'quantity') return calculateTotal(b.sizes) - calculateTotal(a.sizes);
       return 0;
     });
-  }, [auditData, searchTerm, marketingStatus, marketingSort]);
+  }, [auditData, searchTerm, marketingStatus, marketingSort, marketingStore]);
 
   // --- RENDERIZAÇÃO COMPONENTES ---
   const GroupedDifferenceTable = ({ items, title, icon: Icon, colorClass, bgClass, isExit }) => {
@@ -2696,34 +2709,115 @@ const App = () => {
                             <button onClick={() => { setPrintMode(true); setTimeout(() => { window.print(); setPrintMode(false); }, 300); }} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600 transition-all no-print">
                               <Printer className="w-4 h-4"/> Imprimir
                             </button>
-                            <div className="text-xs space-x-2">
-                              <button onClick={() => setMarketingSort('recent')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'recent' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Recentes</button>
-                              <button onClick={() => setMarketingSort('no-photo')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'no-photo' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Sem Foto</button>
-                              <button onClick={() => setMarketingSort('to-post')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'to-post' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Postar</button>
-                            </div>
                           </div>
                       </div>
-                      <input type="text" placeholder="Filtrar..." className="w-full border border-gray-300 p-2.5 rounded-lg mb-4 focus:ring-2 focus:ring-pink-400 focus:outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
-                      <div className="space-y-4">
-                          {marketingItems.map(item => {
-                              const key = getItemKey(item);
-                              const isDisc = marketingStatus[key]?.discontinued;
-                              return (
-                                  <div key={key} className={`border rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md ${isDisc ? 'opacity-50 bg-gray-50' : 'bg-white'}`}>
-                                      <div>
-                                          <div className="font-bold text-lg">{item.TIPODESC} <span className="text-gray-500 font-normal text-sm">{item.REFERENCIA}</span></div>
-                                          <div className="text-sm text-gray-600 mt-1">{item.MARCADESC} - {item.COR1DESC}</div>
-                                          <div className="text-xs mt-2 font-mono bg-gray-100 inline-block px-2 py-1 rounded">Grade: {sizeColumns.filter(s => item.sizes[s] > 0).join(', ')}</div>
-                                      </div>
-                                      <div className="flex gap-2">
-                                          <button onClick={() => toggleMarketing(key, 'photo')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.photo ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Camera className="w-4 h-4 mb-1"/> {marketingStatus[key]?.photo ? 'Foto OK' : 'Sem Foto'}</button>
-                                          <button onClick={() => toggleMarketing(key, 'catalog')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.catalog ? 'bg-green-50 border-green-300 text-green-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Smartphone className="w-4 h-4 mb-1"/> {marketingStatus[key]?.catalog ? 'Catálogo' : 'Add Whats'}</button>
-                                          <button onClick={() => toggleMarketing(key, 'posted')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.posted ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Instagram className="w-4 h-4 mb-1"/> {marketingStatus[key]?.posted ? 'Postado' : 'Postar'}</button>
-                                          <button onClick={() => toggleMarketing(key, 'discontinued')} className="text-gray-400 hover:text-gray-600 ml-2 transition-colors" title="Fora de Linha"><Archive className="w-4 h-4"/></button>
-                                      </div>
-                                  </div>
-                              );
-                          })}
+
+                      {/* SELETOR DE LOJA */}
+                      <div className="mb-5 flex flex-wrap items-center gap-2 p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100">
+                        <div className="flex items-center gap-2 mr-1">
+                          <Share2 className="w-4 h-4 text-pink-500"/>
+                          <span className="text-xs font-bold text-pink-700 uppercase tracking-wide">Loja:</span>
+                        </div>
+                        <button
+                          onClick={() => setMarketingStore('all')}
+                          className={'px-3 py-2 rounded-xl text-sm font-bold transition-all border ' +
+                            (marketingStore === 'all'
+                              ? 'bg-pink-600 text-white border-pink-600 shadow-md scale-105'
+                              : 'bg-white text-pink-600 border-pink-200 hover:border-pink-400 hover:bg-pink-50')}>
+                          🏪 Todas
+                        </button>
+                        {Object.entries(STORE_CONFIGS).map(([k, v]) => (
+                          <button key={k}
+                            onClick={() => setMarketingStore(k)}
+                            className={'px-3 py-2 rounded-xl text-sm font-bold transition-all border ' +
+                              (marketingStore === k
+                                ? 'bg-pink-600 text-white border-pink-600 shadow-md scale-105'
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600')}>
+                            {v.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* FILTROS DE VIEW */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {[
+                          { id: 'recent',     label: 'Recentes' },
+                          { id: 'no-photo',   label: 'Sem Foto' },
+                          { id: 'to-post',    label: 'Postar' },
+                          { id: 'archived',   label: '🗂 Arquivados' },
+                        ].map(({ id, label }) => (
+                          <button key={id} onClick={() => setMarketingSort(id)}
+                            className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium border ${
+                              marketingSort === id
+                                ? id === 'archived'
+                                  ? 'bg-gray-700 text-white border-gray-700 shadow-sm'
+                                  : 'bg-pink-100 text-pink-800 border-pink-200 shadow-sm'
+                                : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                            }`}>
+                            {label}
+                          </button>
+                        ))}
+                        <span className="ml-auto text-xs text-gray-400 self-center">
+                          {marketingItems.length} ite{marketingItems.length !== 1 ? 'ns' : 'm'}
+                        </span>
+                      </div>
+
+                      <input type="text" placeholder="Buscar por referência, modelo ou marca..." className="w-full border border-gray-300 p-2.5 rounded-lg mb-4 focus:ring-2 focus:ring-pink-400 focus:outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
+
+                      {/* LISTA DE ITENS */}
+                      <div className="space-y-3">
+                        {marketingItems.length === 0 ? (
+                          <div className="text-center py-12 text-gray-400">
+                            {marketingSort === 'archived'
+                              ? <><Archive className="w-12 h-12 mx-auto mb-3 opacity-20"/><p className="font-medium">Nenhum item arquivado</p><p className="text-sm mt-1">Itens arquivados aparecem aqui e podem ser restaurados</p></>
+                              : <><Package className="w-12 h-12 mx-auto mb-3 opacity-20"/><p className="font-medium">Nenhum item encontrado</p></>
+                            }
+                          </div>
+                        ) : marketingItems.map(item => {
+                          const key = getItemKey(item);
+                          const mStatus = marketingStatus[key] || {};
+                          const isArchived = marketingSort === 'archived';
+                          const stockTotal = calculateTotal(item.sizes);
+                          return (
+                            <div key={key} className={`border rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md ${
+                              isArchived ? 'bg-gray-50 border-gray-200 opacity-70' : 'bg-white border-gray-200'
+                            }`}>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-base">{item.TIPODESC} <span className="text-gray-500 font-normal text-sm">{item.REFERENCIA}</span></div>
+                                <div className="text-sm text-gray-500 mt-0.5">{item.MARCADESC}{item.COR1DESC ? ` · ${item.COR1DESC}` : ''}</div>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{sizeColumns.filter(s => (parseInt(item.sizes[s])||0) > 0).join(', ') || '—'}</span>
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${stockTotal > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{stockTotal} peça{stockTotal !== 1 ? 's' : ''}</span>
+                                  {isArchived && <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Arquivado</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isArchived ? (
+                                  // Vista Arquivados: só botão de restaurar
+                                  <button
+                                    onClick={() => toggleMarketing(key, 'discontinued')}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 transition-all"
+                                    title="Restaurar item">
+                                    <RefreshCw className="w-4 h-4"/> Restaurar
+                                  </button>
+                                ) : (
+                                  // Vista normal: ações de marketing
+                                  <>
+                                    <button onClick={() => toggleMarketing(key, 'photo')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${mStatus.photo ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Camera className="w-4 h-4 mb-1"/> {mStatus.photo ? 'Foto OK' : 'Sem Foto'}</button>
+                                    <button onClick={() => toggleMarketing(key, 'catalog')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${mStatus.catalog ? 'bg-green-50 border-green-300 text-green-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Smartphone className="w-4 h-4 mb-1"/> {mStatus.catalog ? 'Catálogo' : 'Add Whats'}</button>
+                                    <button onClick={() => toggleMarketing(key, 'posted')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${mStatus.posted ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Instagram className="w-4 h-4 mb-1"/> {mStatus.posted ? 'Postado' : 'Postar'}</button>
+                                    <button
+                                      onClick={() => toggleMarketing(key, 'discontinued')}
+                                      className="text-gray-300 hover:text-gray-500 ml-1 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                                      title="Arquivar (Fora de Linha)">
+                                      <Archive className="w-4 h-4"/>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                  </div>
             </div>
