@@ -294,6 +294,7 @@ const App = () => {
   const [dashboardSizeFilter, setDashboardSizeFilter] = useState('');
   const [dashboardCategoryFilter, setDashboardCategoryFilter] = useState('');
   const [showDashboardFilters, setShowDashboardFilters] = useState(false);
+  const [dashboardStore, setDashboardStore] = useState('all'); // 'all' ou código de loja específico
   const [expandedMonthRow, setExpandedMonthRow] = useState(null); // for seller drill-down in projection table
   
   // --- Estados de Negócio ---
@@ -571,10 +572,19 @@ const App = () => {
   const exits = differences.filter(d => d.diffTotal < 0 && !completedIds.has(d.id));
   const entries = differences.filter(d => d.diffTotal > 0 && !completedIds.has(d.id));
 
+  // Dados de auditoria filtrados pela loja selecionada no dashboard
+  const dashboardAuditData = useMemo(() => {
+    if (dashboardStore === 'all') return auditData;
+    // Se os itens têm store_code, filtrar; caso contrário, mostrar todos (compatibilidade)
+    const hasStoreCodes = auditData.some(i => i.store_code || i.storeCode);
+    if (!hasStoreCodes) return auditData;
+    return auditData.filter(i => (i.store_code || i.storeCode) === dashboardStore);
+  }, [auditData, dashboardStore]);
+
   const dashboardStats = useMemo(() => {
     const categoryStats = {};
     const categoryItems = {}; // itens por categoria
-    auditData.forEach(item => {
+    dashboardAuditData.forEach(item => {
       const category = item.TIPODESC || "OUTROS";
       if (!categoryStats[category]) {
         categoryStats[category] = { total: 0, sizes: {} };
@@ -591,37 +601,37 @@ const App = () => {
       }
     });
     const sortedCategories = Object.entries(categoryStats).sort(([, a], [, b]) => b.total - a.total);
-    const lastPieces = auditData.filter(item => calculateTotal(item.sizes) === 1).sort((a, b) => (a.TIPODESC || "").localeCompare(b.TIPODESC || ""));
-    const heavyStock = auditData.filter(item => calculateTotal(item.sizes) >= 5).sort((a, b) => b.QTDE - a.QTDE);
-    const totalItems = auditData.length;
-    const totalPieces = auditData.reduce((acc, item) => acc + calculateTotal(item.sizes), 0);
+    const lastPieces = dashboardAuditData.filter(item => calculateTotal(item.sizes) === 1).sort((a, b) => (a.TIPODESC || "").localeCompare(b.TIPODESC || ""));
+    const heavyStock = dashboardAuditData.filter(item => calculateTotal(item.sizes) >= 5).sort((a, b) => b.QTDE - a.QTDE);
+    const totalItems = dashboardAuditData.length;
+    const totalPieces = dashboardAuditData.reduce((acc, item) => acc + calculateTotal(item.sizes), 0);
     const avgPiecesPerItem = totalItems > 0 ? (totalPieces / totalItems).toFixed(1) : 0;
-    const zeroStock = auditData.filter(item => calculateTotal(item.sizes) === 0).length;
+    const zeroStock = dashboardAuditData.filter(item => calculateTotal(item.sizes) === 0).length;
     return { sortedCategories, categoryItems, lastPieces, heavyStock, totalItems, totalPieces, avgPiecesPerItem, zeroStock };
-  }, [auditData]);
+  }, [dashboardAuditData]);
 
   // Tamanhos disponíveis no estoque inteiro (para filtro global)
   const allAvailableSizes = useMemo(() => {
     const sizeSet = new Set();
-    auditData.forEach(item => {
+    dashboardAuditData.forEach(item => {
       sizeColumns.forEach(s => {
         if ((parseInt(item.sizes[s]) || 0) > 0) sizeSet.add(s);
       });
     });
     return sizeColumns.filter(s => sizeSet.has(s));
-  }, [auditData]);
+  }, [dashboardAuditData]);
 
   // Itens filtrados pelo painel de filtros global do dashboard
   const dashboardFilteredItems = useMemo(() => {
     if (!dashboardSizeFilter && !dashboardCategoryFilter) return [];
-    return auditData.filter(item => {
+    return dashboardAuditData.filter(item => {
       const total = calculateTotal(item.sizes);
       if (total <= 0) return false;
       if (dashboardCategoryFilter && (item.TIPODESC || 'OUTROS') !== dashboardCategoryFilter) return false;
       if (dashboardSizeFilter && !((parseInt(item.sizes[dashboardSizeFilter]) || 0) > 0)) return false;
       return true;
     });
-  }, [auditData, dashboardSizeFilter, dashboardCategoryFilter]);
+  }, [dashboardAuditData, dashboardSizeFilter, dashboardCategoryFilter]);
 
   const heavyStockToDisplay = printMode ? dashboardStats.heavyStock : dashboardStats.heavyStock.slice(0, 20);
 
@@ -2418,7 +2428,7 @@ const App = () => {
         {activeTab === 'dashboard' && (
             <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border shadow-lg">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-4">
                       <h2 className="font-bold text-gray-800 text-xl flex items-center gap-2"><BarChart3 className="w-6 h-6 text-purple-600"/> Dashboard</h2>
                       <div className="flex items-center gap-2">
                         <button onClick={() => { setPrintMode(true); setTimeout(() => { window.print(); setPrintMode(false); }, 300); }} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600 transition-all no-print">
@@ -2441,6 +2451,35 @@ const App = () => {
                           )}
                         </button>
                       </div>
+                    </div>
+
+                    {/* SELETOR DE LOJA — fonte: Auditoria de Estoque */}
+                    <div className="mb-6 flex flex-wrap items-center gap-2 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl border border-purple-100">
+                      <div className="flex items-center gap-2 mr-1">
+                        <BarChart3 className="w-4 h-4 text-purple-600"/>
+                        <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">Visualizando:</span>
+                      </div>
+                      <button
+                        onClick={() => { setDashboardStore('all'); setDashboardSizeFilter(''); setDashboardCategoryFilter(''); }}
+                        className={'px-3 py-2 rounded-xl text-sm font-bold transition-all border ' +
+                          (dashboardStore === 'all'
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-md scale-105'
+                            : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400 hover:bg-purple-50')}>
+                        🏪 Todas
+                      </button>
+                      {Object.entries(STORE_CONFIGS).map(([k, v]) => (
+                        <button key={k}
+                          onClick={() => { setDashboardStore(k); setDashboardSizeFilter(''); setDashboardCategoryFilter(''); }}
+                          className={'px-3 py-2 rounded-xl text-sm font-bold transition-all border ' +
+                            (dashboardStore === k
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-md scale-105'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600')}>
+                          {v.name}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-xs text-purple-400 italic hidden md:block">
+                        Fonte: Auditoria (contagem física)
+                      </span>
                     </div>
 
                     {/* PAINEL DE FILTROS GLOBAL */}
