@@ -1797,82 +1797,448 @@ const App = () => {
     );
   };
 
-  // ── RENDER: RH TAB ────────────────────────────────────────
-  const formatDateBR = (s) => { if (!s) return '—'; const ts = parseDate(s); return ts ? new Date(ts).toLocaleDateString('pt-BR') : s; };
+  // ── RENDER: RH TAB — SPRINT 4 + 5 ───────────────────────
+  const formatDateBR = (s) => {
+    if (!s) return '—';
+    if (s.includes('-')) { const [y,m,d] = s.split('T')[0].split('-'); return d+'/'+m+'/'+y; }
+    return s;
+  };
+
+  // ── Funções utilitárias (hrUtils inline) ─────────────────
+  const HR_STATUS_OPTIONS = ['Banco de Talentos','Em análise','Entrevista agendada','Entrevista realizada','Fase de Teste','Contratado','Recusado','Aguardando retorno','Desistiu'];
+  const HR_FONTE_OPTIONS  = ['Instagram','Indicação','Indeed','LinkedIn','Vitrine','WhatsApp','Outro'];
+  const HR_MOTIVO_OPTIONS = ['—','Não compareceu','Desistiu','Perfil inadequado','Salário incompatível','Sem experiência','Reprovado no teste','Vaga preenchida','Em análise','Aprovado'];
+
+  const hrDiasAteResposta = (c) => {
+    if (!c.recebimento_curriculo || !c.data_resposta) return null;
+    return Math.round((new Date(c.data_resposta) - new Date(c.recebimento_curriculo)) / 86400000);
+  };
+  const hrDiasAteEntrevista = (c) => {
+    if (!c.data_resposta || !c.entrevista_agendada) return null;
+    return Math.round((new Date(c.entrevista_agendada) - new Date(c.data_resposta)) / 86400000);
+  };
+  const hrLinkWA = (tel) => {
+    if (!tel) return null;
+    const n = tel.replace(/\D/g,'');
+    return 'https://wa.me/' + (n.startsWith('55') ? n : '55'+n);
+  };
+  const hrEtapaMaxima = (s) => {
+    if (!s) return '1. Currículo recebido';
+    if (s === 'Contratado')            return '6. Contratado';
+    if (s.includes('Teste'))           return '5. Fase de Teste';
+    if (s === 'Entrevista realizada')  return '4. Entrevista realizada';
+    if (s === 'Entrevista agendada')   return '3. Entrevista agendada';
+    if (s === 'Em análise')            return '2. Em análise';
+    return '1. Currículo recebido';
+  };
+  const hrMacroStatus = (s, m) => {
+    if (!s) return '—';
+    if (s === 'Contratado')                              return '✅ Contratado';
+    if (s === 'Recusado' && m === 'Não compareceu')      return '🚫 No-Show';
+    if (s === 'Recusado' && m === 'Desistiu')            return '🔙 Desistência';
+    if (s === 'Recusado' && m === 'Perfil inadequado')   return '❌ Perfil Inadequado';
+    if (s === 'Recusado' && m === 'Salário incompatível') return '💰 Salário';
+    if (s === 'Recusado' && m === 'Reprovado no teste')  return '📝 Reprovado';
+    if (s === 'Recusado')                                return '❌ Recusado';
+    if (s === 'Fase de Teste')                           return '🧪 Em Teste';
+    if (s === 'Entrevista realizada')                    return '🎙️ Entrevistado';
+    if (s === 'Entrevista agendada')                     return '📅 Agendado';
+    if (s === 'Aguardando retorno')                      return '⏳ Aguardando';
+    if (s === 'Desistiu')                                return '🔙 Desistência';
+    if (s === 'Em análise')                              return '🔍 Em Análise';
+    return '📋 ' + s;
+  };
+  const hrGargalo = (c) => {
+    if (c.recebimento_curriculo && !c.data_resposta) {
+      const h = (Date.now() - new Date(c.recebimento_curriculo).getTime()) / 3600000;
+      if (h > 24) return 'Atraso no retorno';
+    }
+    const dr = hrDiasAteResposta(c);
+    if (dr !== null && dr > 1) return 'Resposta lenta';
+    const de = hrDiasAteEntrevista(c);
+    if (de !== null && de > 7) return 'Entrevista demorada';
+    return null;
+  };
+  const hrAlertaSLA = (c) => {
+    if (!c.recebimento_curriculo || c.data_resposta) return false;
+    return (Date.now() - new Date(c.recebimento_curriculo).getTime()) / 3600000 > 24;
+  };
+  const hrGatilhosStatus = (novoStatus, cand) => {
+    const hoje = new Date().toISOString().split('T')[0];
+    const u = { status_processo: novoStatus, updated_at: new Date().toISOString() };
+    if (['Entrevista agendada','Entrevista realizada'].includes(novoStatus)) {
+      if (!cand.data_resposta)       u.data_resposta       = hoje;
+      if (!cand.entrevista_agendada) u.entrevista_agendada = hoje;
+    }
+    if (['Recusado','Contratado'].includes(novoStatus) && !cand.data_resposta) {
+      u.data_resposta = hoje;
+    }
+    u.etapa_maxima       = hrEtapaMaxima(novoStatus);
+    u.macro_status_final = hrMacroStatus(novoStatus, cand.motivo_detalhes);
+    return u;
+  };
+
   const HR_STATUS_COLORS = {
-    'Banco de Talentos':    { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300' },
-    'Recusado':             { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
-    'Contratado':           { bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
-    'Em análise':           { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
-    'Entrevista agendada':  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300' },
-    'Entrevista realizada': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
-    'Aguardando retorno':   { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+    'Banco de Talentos':    { bg:'bg-gray-100',   text:'text-gray-700',   border:'border-gray-300',   dot:'bg-gray-400'   },
+    'Em análise':           { bg:'bg-yellow-100', text:'text-yellow-800', border:'border-yellow-300', dot:'bg-yellow-500' },
+    'Entrevista agendada':  { bg:'bg-blue-100',   text:'text-blue-800',   border:'border-blue-300',   dot:'bg-blue-500'   },
+    'Entrevista realizada': { bg:'bg-purple-100', text:'text-purple-800', border:'border-purple-300', dot:'bg-purple-500' },
+    'Fase de Teste':        { bg:'bg-indigo-100', text:'text-indigo-800', border:'border-indigo-300', dot:'bg-indigo-500' },
+    'Contratado':           { bg:'bg-green-100',  text:'text-green-800',  border:'border-green-300',  dot:'bg-green-500'  },
+    'Recusado':             { bg:'bg-red-100',    text:'text-red-800',    border:'border-red-300',    dot:'bg-red-500'    },
+    'Aguardando retorno':   { bg:'bg-orange-100', text:'text-orange-800', border:'border-orange-300', dot:'bg-orange-500' },
+    'Desistiu':             { bg:'bg-gray-100',   text:'text-gray-500',   border:'border-gray-200',   dot:'bg-gray-400'   },
+  };
+
+  // ── Estado local para novo candidato / edição ─────────────
+  const [hrShowForm, setHrShowForm] = useState(false);
+  const [hrEditId, setHrEditId] = useState(null);
+  const [hrQuickFilter, setHrQuickFilter] = useState('all'); // 'all'|'atrasos'|'entrevistas'|'contratados'
+  const [hrForm, setHrForm] = useState({
+    candidato:'', telefone:'', fonte_captacao:'', recebimento_curriculo: new Date().toISOString().split('T')[0],
+    data_resposta:'', entrevista_agendada:'', data_teste:'', status_processo:'Banco de Talentos',
+    motivo_detalhes:'—', nota_interna:'', observacoes:'', responsavel:'',
+    retornou:false, interessado:false, recusa:false, desvio:false,
+  });
+
+  const hrResetForm = () => {
+    setHrForm({ candidato:'', telefone:'', fonte_captacao:'', recebimento_curriculo: new Date().toISOString().split('T')[0], data_resposta:'', entrevista_agendada:'', data_teste:'', status_processo:'Banco de Talentos', motivo_detalhes:'—', nota_interna:'', observacoes:'', responsavel:'', retornou:false, interessado:false, recusa:false, desvio:false });
+    setHrEditId(null);
+    setHrShowForm(false);
+  };
+
+  const hrHandleStatusChange = (novoStatus) => {
+    const gatilhos = hrGatilhosStatus(novoStatus, hrForm);
+    setHrForm(prev => ({ ...prev, ...gatilhos }));
+  };
+
+  const hrSaveCandidate = async () => {
+    if (!hrForm.candidato.trim()) { alert('Nome do candidato é obrigatório.'); return; }
+    const gargalo = hrGargalo(hrForm);
+    const payload = {
+      ...hrForm,
+      store_code: selectedStore,
+      whatsapp: hrForm.telefone ? hrForm.telefone.replace(/\D/g,'') : null,
+      etapa_maxima: hrEtapaMaxima(hrForm.status_processo),
+      macro_status_final: hrMacroStatus(hrForm.status_processo, hrForm.motivo_detalhes),
+      gargalo: gargalo,
+      nota_interna: hrForm.nota_interna ? parseInt(hrForm.nota_interna) : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (hrEditId) {
+      await supabase.from('hr_candidates').update(payload).eq('id', hrEditId);
+    } else {
+      await supabase.from('hr_candidates').insert([payload]);
+    }
+    await loadHrCandidates();
+    hrResetForm();
+  };
+
+  const hrDeleteCandidate = async (id) => {
+    if (!confirm('Excluir este candidato?')) return;
+    await supabase.from('hr_candidates').delete().eq('id', id);
+    setHrCandidates(prev => prev.filter(c => c.id !== id));
+  };
+
+  const hrStartEdit = (cand) => {
+    setHrForm({
+      candidato: cand.candidato || '', telefone: cand.telefone || '',
+      fonte_captacao: cand.fonte_captacao || '', recebimento_curriculo: cand.recebimento_curriculo || '',
+      data_resposta: cand.data_resposta || '', entrevista_agendada: cand.entrevista_agendada || '',
+      data_teste: cand.data_teste || '', status_processo: cand.status_processo || 'Banco de Talentos',
+      motivo_detalhes: cand.motivo_detalhes || '—', nota_interna: cand.nota_interna || '',
+      observacoes: cand.observacoes || '', responsavel: cand.responsavel || '',
+      retornou: cand.retornou||false, interessado: cand.interessado||false,
+      recusa: cand.recusa||false, desvio: cand.desvio||false,
+    });
+    setHrEditId(cand.id);
+    setHrShowForm(true);
   };
 
   const renderHrTab = () => {
-    const STATUSES = ['all','Banco de Talentos','Em análise','Entrevista agendada','Entrevista realizada','Contratado','Recusado','Aguardando retorno'];
-    const filtered = hrCandidates.filter(c => (hrFilter === 'all' || c.status_processo === hrFilter) && (!hrSearch || c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) || c.telefone?.includes(hrSearch)));
-    const stats = { total: hrCandidates.length, interessados: hrCandidates.filter(c => c.interessado).length, entrevistas: hrCandidates.filter(c => c.entrevista_agendada).length, contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length };
+    // Filtros rápidos
+    let filtered = hrCandidates.filter(c => {
+      if (hrFilter !== 'all' && c.status_processo !== hrFilter) return false;
+      if (hrSearch && !c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) && !c.telefone?.includes(hrSearch)) return false;
+      if (hrQuickFilter === 'atrasos') return hrAlertaSLA(c) || (hrGargalo(c) && hrGargalo(c) !== null);
+      if (hrQuickFilter === 'entrevistas') return c.status_processo === 'Entrevista agendada' || c.status_processo === 'Entrevista realizada';
+      if (hrQuickFilter === 'contratados') return c.status_processo === 'Contratado';
+      if (hrQuickFilter === 'semretorno') return !c.data_resposta && c.recebimento_curriculo;
+      return true;
+    });
+
+    const stats = {
+      total: hrCandidates.length,
+      atrasos: hrCandidates.filter(c => hrAlertaSLA(c)).length,
+      entrevistas: hrCandidates.filter(c => c.status_processo === 'Entrevista agendada').length,
+      contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length,
+      semRetorno: hrCandidates.filter(c => !c.data_resposta && c.recebimento_curriculo).length,
+    };
+
     return (
       <div className="space-y-4">
+
+        {/* HEADER */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3"><div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div><div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Seleção</h2><p className="text-xs text-gray-500">Gestão de candidatos</p></div></div>
-            <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><Upload className="w-4 h-4"/> Importar Candidatos</button>
+            <div className="flex items-center gap-3">
+              <div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div>
+              <div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Seleção</h2><p className="text-xs text-gray-500">Gestão de candidatos</p></div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 border border-rose-300 text-rose-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-rose-50 transition-colors"><Upload className="w-4 h-4"/> Importar</button>
+              <button onClick={() => { hrResetForm(); setHrShowForm(true); }} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><PlusCircle className="w-4 h-4"/> Novo Candidato</button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            {[{label:'Total',value:stats.total,color:'text-gray-700',bg:'bg-gray-50'},{label:'Interessados',value:stats.interessados,color:'text-blue-700',bg:'bg-blue-50'},{label:'Entrevistas',value:stats.entrevistas,color:'text-purple-700',bg:'bg-purple-50'},{label:'Contratados',value:stats.contratados,color:'text-green-700',bg:'bg-green-50'}].map(s => (
-              <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-gray-500 mt-0.5">{s.label}</div></div>
+
+          {/* KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
+            {[
+              { label:'Total', value:stats.total, color:'text-gray-700', bg:'bg-gray-50', filter:'all' },
+              { label:'⚠️ Atrasos', value:stats.atrasos, color:'text-orange-700', bg:'bg-orange-50', filter:'atrasos' },
+              { label:'📅 Entrevistas', value:stats.entrevistas, color:'text-blue-700', bg:'bg-blue-50', filter:'entrevistas' },
+              { label:'✅ Contratados', value:stats.contratados, color:'text-green-700', bg:'bg-green-50', filter:'contratados' },
+              { label:'🔇 Sem retorno', value:stats.semRetorno, color:'text-red-700', bg:'bg-red-50', filter:'semretorno' },
+            ].map(s => (
+              <button key={s.label} onClick={() => setHrQuickFilter(hrQuickFilter === s.filter ? 'all' : s.filter)}
+                className={'rounded-xl p-2.5 text-center transition-all border-2 ' + s.bg + ' ' + (hrQuickFilter === s.filter ? 'border-rose-400 shadow-md' : 'border-transparent')}>
+                <div className={'text-2xl font-bold ' + s.color}>{s.value}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+              </button>
             ))}
           </div>
         </div>
+
+        {/* FILTROS */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-48"><Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/><input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/></div>
-            <div className="flex flex-wrap gap-1.5">{STATUSES.map(s => (<button key={s} onClick={() => setHrFilter(s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>{s === 'all' ? 'Todos' : s}</button>))}</div>
+            <div className="relative flex-1 min-w-48">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/>
+              <input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['all',...HR_STATUS_OPTIONS].map(s => (
+                <button key={s} onClick={() => setHrFilter(s)}
+                  className={'text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ' + (hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300')}>
+                  {s === 'all' ? 'Todos' : s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* FORMULÁRIO NOVO / EDITAR */}
+        {hrShowForm && (
+          <div className="bg-white rounded-2xl border-2 border-rose-200 shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-rose-800 text-lg flex items-center gap-2">
+                <UserCheck className="w-5 h-5"/> {hrEditId ? 'Editar Candidato' : 'Novo Candidato'}
+              </h3>
+              <button onClick={hrResetForm} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Nome */}
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-bold text-gray-600 mb-1">Nome do Candidato *</label>
+                <input value={hrForm.candidato} onChange={e => setHrForm(p=>({...p,candidato:e.target.value}))} placeholder="Nome completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              {/* Telefone */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Telefone</label>
+                <input value={hrForm.telefone} onChange={e => setHrForm(p=>({...p,telefone:e.target.value}))} placeholder="(11) 99999-9999" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              {/* Status — DROPDOWN */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Status do Processo</label>
+                <select value={hrForm.status_processo} onChange={e => hrHandleStatusChange(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
+                  {HR_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              {/* Motivo — DROPDOWN */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Motivo / Detalhes</label>
+                <select value={hrForm.motivo_detalhes} onChange={e => setHrForm(p=>({...p,motivo_detalhes:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
+                  {HR_MOTIVO_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              {/* Fonte */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Fonte de Captação</label>
+                <select value={hrForm.fonte_captacao} onChange={e => setHrForm(p=>({...p,fonte_captacao:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
+                  <option value="">—</option>
+                  {HR_FONTE_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              {/* Datas */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Recebimento Currículo <span className="text-rose-500 text-xs">(auto)</span></label>
+                <input type="date" value={hrForm.recebimento_curriculo} onChange={e => setHrForm(p=>({...p,recebimento_curriculo:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Data de Resposta</label>
+                <input type="date" value={hrForm.data_resposta} onChange={e => setHrForm(p=>({...p,data_resposta:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Entrevista Agendada</label>
+                <input type="date" value={hrForm.entrevista_agendada} onChange={e => setHrForm(p=>({...p,entrevista_agendada:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Data do Teste</label>
+                <input type="date" value={hrForm.data_teste} onChange={e => setHrForm(p=>({...p,data_teste:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              {/* Nota */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Nota Interna (1-5)</label>
+                <select value={hrForm.nota_interna} onChange={e => setHrForm(p=>({...p,nota_interna:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
+                  <option value="">—</option>
+                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{'⭐'.repeat(n)} {n}</option>)}
+                </select>
+              </div>
+              {/* Responsável */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Responsável</label>
+                <input value={hrForm.responsavel} onChange={e => setHrForm(p=>({...p,responsavel:e.target.value}))} placeholder="Nome da gerente" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
+              </div>
+              {/* Observações */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-bold text-gray-600 mb-1">Observações</label>
+                <textarea value={hrForm.observacoes} onChange={e => setHrForm(p=>({...p,observacoes:e.target.value}))} rows={2} placeholder="Anotações sobre o candidato..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
+              </div>
+              {/* Flags */}
+              <div className="flex flex-wrap gap-4 items-center">
+                {[['interessado','✓ Interessado'],['retornou','↩ Retornou'],['recusa','✗ Recusa'],['desvio','⚠ Desvio']].map(([k,l]) => (
+                  <label key={k} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={hrForm[k]} onChange={e => setHrForm(p=>({...p,[k]:e.target.checked}))} className="w-4 h-4 rounded accent-rose-500"/>
+                    <span className="text-gray-700">{l}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={hrResetForm} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button>
+              <button onClick={hrSaveCandidate} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors shadow-md">
+                {hrEditId ? 'Salvar Alterações' : 'Adicionar Candidato'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* KANBAN / CARDS */}
         <div className="space-y-2">
-          {filtered.length === 0 && (<div className="bg-white rounded-2xl border border-gray-200 p-12 text-center"><Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/><p className="text-gray-500 font-medium">Nenhum candidato encontrado</p><p className="text-gray-400 text-sm mt-1">Importe candidatos usando o botão acima</p></div>)}
+          {filtered.length === 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+              <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/>
+              <p className="text-gray-500 font-medium">Nenhum candidato encontrado</p>
+              <p className="text-gray-400 text-sm mt-1">Crie um novo candidato ou ajuste os filtros</p>
+            </div>
+          )}
+
           {filtered.map(cand => {
             const isOpen = hrExpanded.has(cand.id);
             const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
             const toggleExpand = () => { const ns = new Set(hrExpanded); ns.has(cand.id) ? ns.delete(cand.id) : ns.add(cand.id); setHrExpanded(ns); };
+            const gargalo = hrGargalo(cand);
+            const sla = hrAlertaSLA(cand);
+            const diasResp = hrDiasAteResposta(cand);
+            const waLink = hrLinkWA(cand.telefone || cand.whatsapp);
+            const macro = hrMacroStatus(cand.status_processo, cand.motivo_detalhes);
+
             return (
-              <div key={cand.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleExpand}>
+              <div key={cand.id} className={'rounded-2xl border shadow-sm overflow-hidden transition-all ' + (sla ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200 bg-white')}>
+
+                {/* SLA alert banner */}
+                {sla && (
+                  <div className="bg-orange-100 border-b border-orange-200 px-4 py-1.5 flex items-center gap-2 text-xs text-orange-700 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0"/> ⚠️ Atraso no retorno — currículo recebido sem resposta há mais de 24h
+                  </div>
+                )}
+
+                {/* Card header */}
+                <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 transition-colors" onClick={toggleExpand}>
+                  {/* Status dot */}
+                  <div className={'w-2.5 h-2.5 rounded-full shrink-0 ' + sc.dot}></div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-800">{cand.candidato}</span>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sc.bg} ${sc.text} ${sc.border}`}>{cand.status_processo || '—'}</span>
-                      {cand.interessado && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">✓ Interessado</span>}
+                      <span className="font-semibold text-gray-800 text-sm">{cand.candidato}</span>
+                      <span className={'text-xs px-2 py-0.5 rounded-full border font-medium ' + sc.bg + ' ' + sc.text + ' ' + sc.border}>
+                        {cand.status_processo || '—'}
+                      </span>
+                      {macro !== '—' && (
+                        <span className="text-xs text-gray-500">{macro}</span>
+                      )}
+                      {cand.nota_interna && (
+                        <span className="text-xs text-yellow-600">{'⭐'.repeat(cand.nota_interna)}</span>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
                       {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
-                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>Currículo: {formatDateBR(cand.recebimento_curriculo)}</span>}
-                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-purple-600"><Clock className="w-3 h-3"/>Entrevista: {formatDateBR(cand.entrevista_agendada)}</span>}
+                      {cand.fonte_captacao && <span className="flex items-center gap-1"><Share2 className="w-3 h-3"/>{cand.fonte_captacao}</span>}
+                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>{formatDateBR(cand.recebimento_curriculo)}</span>}
+                      {diasResp !== null && <span className={'flex items-center gap-1 font-medium ' + (diasResp > 1 ? 'text-red-600' : 'text-green-600')}><Clock className="w-3 h-3"/>{diasResp}d resposta</span>}
+                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-blue-600"><Clock className="w-3 h-3"/>Entrev: {formatDateBR(cand.entrevista_agendada)}</span>}
+                      {gargalo && <span className="flex items-center gap-1 text-orange-600 font-medium"><AlertCircle className="w-3 h-3"/>{gargalo}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && <AlertCircle className="w-4 h-4 text-orange-500"/>}
-                    {cand.whatsapp && (<a href={`https://wa.me/${cand.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-200"><MessageCircle className="w-3.5 h-3.5"/> WA</a>)}
+
+                  {/* Ações rápidas */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {waLink && (
+                      <a href={waLink} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition-colors">
+                        <MessageCircle className="w-3.5 h-3.5"/> WA
+                      </a>
+                    )}
+                    <button onClick={e => { e.stopPropagation(); hrStartEdit(cand); }}
+                      className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+                      <FileText className="w-4 h-4"/>
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); hrDeleteCandidate(cand.id); }}
+                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-4 h-4"/>
+                    </button>
                     {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
                   </div>
                 </div>
+
+                {/* Detalhes expandidos */}
                 {isOpen && (
-                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
+                  <div className="border-t border-gray-100 p-4 bg-gray-50/50 space-y-3">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[{label:'Data Resposta',value:formatDateBR(cand.data_resposta)},{label:'Entrevista',value:formatDateBR(cand.entrevista_agendada)},{label:'Responsável',value:cand.responsavel},{label:'Etapa Máxima',value:cand.etapa_maxima},{label:'Macro Status',value:cand.macro_status_final},{label:'Gargalo',value:cand.gargalo},{label:'Fonte',value:cand.fonte_captacao},{label:'Nota',value:cand.nota_interna}].filter(f => f.value && f.value !== '—').map(f => (<div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100"><div className="text-xs text-gray-400 mb-0.5">{f.label}</div><div className="text-sm font-medium text-gray-700">{f.value}</div></div>))}
+                      {[
+                        { label:'Etapa Máxima',   value: cand.etapa_maxima || hrEtapaMaxima(cand.status_processo) },
+                        { label:'Macro Status',   value: macro },
+                        { label:'Gargalo',        value: gargalo || '✅ Fluxo ok' },
+                        { label:'Responsável',    value: cand.responsavel },
+                        { label:'Data Resposta',  value: formatDateBR(cand.data_resposta) },
+                        { label:'Entrevista',     value: formatDateBR(cand.entrevista_agendada) },
+                        { label:'Teste',          value: formatDateBR(cand.data_teste) },
+                        { label:'Motivo',         value: cand.motivo_detalhes !== '—' ? cand.motivo_detalhes : null },
+                      ].filter(f => f.value && f.value !== '—').map(f => (
+                        <div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100">
+                          <div className="text-xs text-gray-400 mb-0.5">{f.label}</div>
+                          <div className="text-sm font-medium text-gray-700">{f.value}</div>
+                        </div>
+                      ))}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {cand.retornou && <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
                       {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">✓ Interessado</span>}
-                      {cand.recusa && <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
-                      {cand.desvio && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
+                      {cand.retornou    && <span className="text-xs bg-blue-100  text-blue-700  px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
+                      {cand.recusa      && <span className="text-xs bg-red-100   text-red-700   px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
+                      {cand.desvio      && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
                     </div>
-                    {cand.motivo_detalhes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">Motivo / Detalhes</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.motivo_detalhes}</p></div>)}
-                    {cand.observacoes && (<div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-xs text-gray-400 mb-1">📝 Observações</div><p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p></div>)}
-                    {cand.gargalo && cand.gargalo !== 'Fluxo ok' && (<div className="bg-orange-50 rounded-lg p-3 border border-orange-200"><div className="text-xs text-orange-500 mb-1">⚠️ Gargalo</div><p className="text-sm text-orange-700 font-medium">{cand.gargalo}</p></div>)}
+                    {cand.observacoes && (
+                      <div className="bg-white rounded-lg p-3 border border-gray-100">
+                        <div className="text-xs text-gray-400 mb-1">📝 Observações</div>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p>
+                      </div>
+                    )}
+                    {/* Editar inline */}
+                    <div className="flex justify-end">
+                      <button onClick={() => hrStartEdit(cand)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-all">
+                        <FileText className="w-4 h-4"/> Editar candidato
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
