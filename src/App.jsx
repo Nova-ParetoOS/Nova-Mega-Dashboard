@@ -1,103 +1,284 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { supabase } from './supabase';
-import {
-  Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download,
-  Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3,
-  TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown,
-  ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff,
-  CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users,
-  TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal,
-  Briefcase, Phone, Clock, AlertCircle, MessageCircle, FileText, Loader2, ImagePlus, Eye
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
 
+// ==========================================
+// 1. CONFIGURAÇÕES FINANCEIRA DAS LOJAS
+// ==========================================
 const STORE_CONFIGS = {
-  '3': { name: 'Loja 03', collaborators: 3, fixedCosts: { aluguel: 0.00, proLabore: 5300.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 }, variableCosts: { cmv: 50.00, imposto: 8.19, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 } },
-  '4': { name: 'Loja 04', collaborators: 4, fixedCosts: { aluguel: 0.00, proLabore: 0.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 11307.95, adm: 840.00, alimentacao: 460.00, transporte: 400.74 }, variableCosts: { cmv: 50.00, imposto: 7.95, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 } },
-  '7': { name: 'Loja 07', collaborators: 5, fixedCosts: { aluguel: 6000.00, proLabore: 5300.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 14134.94, adm: 840.00, alimentacao: 460.00, transporte: 400.74 }, variableCosts: { cmv: 50.00, imposto: 9.36, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 } },
-  '8': { name: 'Loja 08', collaborators: 3, fixedCosts: { aluguel: 0.00, proLabore: 0.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 }, variableCosts: { cmv: 50.00, imposto: 7.21, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 } },
-  '10': { name: 'Loja 10', collaborators: 3, fixedCosts: { aluguel: 8500.00, proLabore: 5000.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 650.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 }, variableCosts: { cmv: 50.00, imposto: 8.64, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 } }
+  '3': {
+    name: 'Loja 03',
+    collaborators: 3,
+    fixedCosts: { aluguel: 0.00, proLabore: 5300.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 },
+    variableCosts: { cmv: 50.00, imposto: 8.19, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 }
+  },
+  '4': {
+    name: 'Loja 04',
+    collaborators: 4,
+    fixedCosts: { aluguel: 0.00, proLabore: 0.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 11307.95, adm: 840.00, alimentacao: 460.00, transporte: 400.74 },
+    variableCosts: { cmv: 50.00, imposto: 7.95, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 }
+  },
+  '7': {
+    name: 'Loja 07',
+    collaborators: 5,
+    fixedCosts: { aluguel: 6000.00, proLabore: 5300.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 14134.94, adm: 840.00, alimentacao: 460.00, transporte: 400.74 },
+    variableCosts: { cmv: 50.00, imposto: 9.36, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 }
+  },
+  '8': {
+    name: 'Loja 08',
+    collaborators: 3,
+    fixedCosts: { aluguel: 0.00, proLabore: 0.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 900.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 },
+    variableCosts: { cmv: 50.00, imposto: 7.21, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 }
+  },
+  '10': {
+    name: 'Loja 10',
+    collaborators: 3,
+    fixedCosts: { aluguel: 8500.00, proLabore: 5000.00, agua: 140.00, luz: 300.00, internet: 200.00, software: 650.00, contabilidade: 850.00, colaboradoras: 8480.96, adm: 840.00, alimentacao: 460.00, transporte: 400.74 },
+    variableCosts: { cmv: 50.00, imposto: 8.64, taxaCartao: 2.00, embalagem: 0.70, obsoleto: 5.00 }
+  }
 };
 
+const initialMockData = [
+  { id: 1, MARCA: "001", MARCALOJA: "LOJA 01", MARCADESC: "NIKE", TIPOLOJA: "CALÇADOS", TIPO: "TENIS", TIPODESC: "TENIS MASCULINO CORRIDA", REFERENCIA: "NK-AIR-001 599.90", COR1DESC: "PRETO", COR2DESC: "", COR3DESC: "", DATAENTRADA: "2023-10-15", CODLOJA: "001", sizes: { P: 0, M: 0, G: 0, GG: 0, '36': 0, '38': 2, '40': 5, '42': 3, '44': -1, '46': 0, '48': 0, '50': 0, '52': 0 }, QTDE: 10 }
+];
+
 const sizeColumns = ['P', 'M', 'G', 'GG', '36', '38', '40', '42', '44', '46', '48', '50', '52'];
+
+// ==========================================
+// 2. HELPERS GLOBAIS
+// ==========================================
 const calculateTotal = (sizesObj) => sizeColumns.reduce((acc, size) => acc + (parseInt(sizesObj[size]) || 0), 0);
+
 const parseDate = (dateStr) => {
   if (!dateStr) return 0;
   const isoDate = new Date(dateStr);
   if (!isNaN(isoDate.getTime())) return isoDate.getTime();
-  try { const parts = dateStr.split(' ')[0].split('/'); if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime(); } catch (e) { return 0; }
+  try {
+    const parts = dateStr.split(' ')[0].split('/');
+    if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+  } catch (e) { return 0; }
   return 0;
 };
+
 const getItemKey = (item) => `${item.REFERENCIA}-${item.COR1DESC}`.trim();
 const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-const parseCurrency = (str) => { if (typeof str === 'number') return str; if (!str || typeof str !== 'string') return 0; return parseFloat(str.replace(/\./g, '').replace(',', '.')); };
-const getMonthName = (monthIndex) => ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][monthIndex - 1] || "";
-const roundToSpecial = (value) => { if (value <= 0) return 0; const t = Math.floor(value / 1000); const r = value % 1000; if (r === 0) return value; if (r <= 900) return (t * 1000) + 900; return ((t + 1) * 1000) + 900; };
+const parseCurrency = (str) => {
+  if (typeof str === 'number') return str;
+  if (!str || typeof str !== 'string') return 0;
+  return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+};
 
+const getMonthName = (monthIndex) => {
+    const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    return months[monthIndex - 1] || "";
+};
+
+const roundToSpecial = (value) => {
+  if (value <= 0) return 0;
+  const thousands = Math.floor(value / 1000);
+  const remainder = value % 1000;
+  if (remainder === 0) return value; // exact thousand → keep (e.g. 20.000)
+  if (remainder <= 900) return (thousands * 1000) + 900; // 001–900 → same milhar .900
+  return ((thousands + 1) * 1000) + 900; // 901–999 → next milhar .900
+};
+
+// ==========================================
+// COMPONENTE: PAINEL DETALHES DA CATEGORIA (Dashboard)
+// ==========================================
 const CategoryDetailPanel = ({ category, items, onClose }) => {
   const [sizeFilter, setSizeFilter] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
-  const availableSizes = useMemo(() => { const s = new Set(); items.forEach(i => { sizeColumns.forEach(c => { if ((parseInt(i.sizes[c]) || 0) > 0) s.add(c); }); }); return sizeColumns.filter(c => s.has(c)); }, [items]);
-  const filteredItems = useMemo(() => items.filter(item => {
-    if (calculateTotal(item.sizes) <= 0) return false;
-    if (sizeFilter && !((parseInt(item.sizes[sizeFilter]) || 0) > 0)) return false;
-    if (searchFilter) { const q = searchFilter.toLowerCase(); if (!(item.REFERENCIA||'').toLowerCase().includes(q) && !(item.MARCADESC||'').toLowerCase().includes(q) && !(item.COR1DESC||'').toLowerCase().includes(q) && !(item.TIPODESC||'').toLowerCase().includes(q)) return false; }
-    return true;
-  }), [items, sizeFilter, searchFilter]);
+
+  // Tamanhos disponíveis nesta categoria
+  const availableSizes = useMemo(() => {
+    const sizeSet = new Set();
+    items.forEach(item => {
+      sizeColumns.forEach(s => {
+        if ((parseInt(item.sizes[s]) || 0) > 0) sizeSet.add(s);
+      });
+    });
+    return sizeColumns.filter(s => sizeSet.has(s));
+  }, [items]);
+
+  // Itens filtrados
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      const total = calculateTotal(item.sizes);
+      if (total <= 0) return false;
+
+      // Filtro por tamanho
+      if (sizeFilter && !((parseInt(item.sizes[sizeFilter]) || 0) > 0)) return false;
+
+      // Filtro por texto
+      if (searchFilter) {
+        const q = searchFilter.toLowerCase();
+        if (
+          !(item.REFERENCIA || '').toLowerCase().includes(q) &&
+          !(item.MARCADESC || '').toLowerCase().includes(q) &&
+          !(item.COR1DESC || '').toLowerCase().includes(q) &&
+          !(item.TIPODESC || '').toLowerCase().includes(q)
+        ) return false;
+      }
+
+      return true;
+    });
+  }, [items, sizeFilter, searchFilter]);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-indigo-100">
+        {/* Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white p-5 rounded-t-2xl flex items-center justify-between">
-          <div><h3 className="font-bold text-xl">{category}</h3><p className="text-sm opacity-80 mt-0.5">{filteredItems.length} modelo{filteredItems.length !== 1 ? 's' : ''}</p></div>
-          <button onClick={onClose} className="bg-white/20 hover:bg-white/30 p-2 rounded-xl"><X className="w-5 h-5" /></button>
+          <div>
+            <h3 className="font-bold text-xl">{category}</h3>
+            <p className="text-sm opacity-80 mt-0.5">{filteredItems.length} modelo{filteredItems.length !== 1 ? 's' : ''} encontrado{filteredItems.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button onClick={onClose} className="bg-white/20 hover:bg-white/30 p-2 rounded-xl transition-colors">
+            <X className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Filtros */}
         <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 space-y-3">
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Buscar..." className="w-full pl-9 pr-4 py-2.5 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={searchFilter} onChange={e => setSearchFilter(e.target.value)} />{searchFilter && <button onClick={() => setSearchFilter('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X className="w-4 h-4" /></button>}</div>
-          <div className="flex flex-wrap gap-2"><button onClick={() => setSizeFilter('')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${sizeFilter===''?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}>Todos</button>{availableSizes.map(size => <button key={size} onClick={() => setSizeFilter(sizeFilter===size?'':size)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${sizeFilter===size?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}>{size}</button>)}</div>
+          {/* Busca textual */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por referência, marca ou cor..."
+              className="w-full pl-9 pr-4 py-2.5 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all"
+              value={searchFilter}
+              onChange={e => setSearchFilter(e.target.value)}
+            />
+            {searchFilter && (
+              <button onClick={() => setSearchFilter('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Filtro de tamanhos */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-bold text-indigo-800 uppercase tracking-wide">Filtrar por Tamanho</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSizeFilter('')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  sizeFilter === ''
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+                }`}
+              >
+                Todos
+              </button>
+              {availableSizes.map(size => (
+                <button
+                  key={size}
+                  onClick={() => setSizeFilter(sizeFilter === size ? '' : size)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                    sizeFilter === size
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {/* Lista de itens */}
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
-          {filteredItems.length === 0
-            ? <div className="text-center py-12 text-gray-400"><Package className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Nenhum modelo encontrado</p></div>
-            : filteredItems.map(item => {
-              const inStock = sizeColumns.filter(s => (parseInt(item.sizes[s]) || 0) > 0);
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">Nenhum modelo encontrado</p>
+              <p className="text-sm mt-1">Tente ajustar os filtros</p>
+            </div>
+          ) : (
+            filteredItems.map(item => {
+              const sizesInStock = sizeColumns.filter(s => (parseInt(item.sizes[s]) || 0) > 0);
               const total = calculateTotal(item.sizes);
-              const totalClass = total === 1 ? 'bg-orange-100 text-orange-700' : total >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700';
+
               return (
-                <div key={item.id} className="bg-gradient-to-br from-white to-indigo-50/30 rounded-xl border border-indigo-100 p-4 hover:shadow-md">
-                  <div className="flex justify-between gap-3 mb-3">
-                    <div>
-                      <div className="font-bold text-sm">{item.TIPODESC}</div>
-                      <div className="text-xs text-indigo-700 font-mono">{item.REFERENCIA}</div>
-                      <div className="text-xs text-gray-500">{item.MARCADESC}{item.COR1DESC ? ' · ' + item.COR1DESC : ''}</div>
+                <div
+                  key={item.id}
+                  className="bg-gradient-to-br from-white to-indigo-50/30 rounded-xl border border-indigo-100 p-4 hover:shadow-md transition-all hover:border-indigo-300"
+                >
+                  {/* Linha principal */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-gray-900 text-sm leading-tight">{item.TIPODESC}</div>
+                      <div className="text-xs text-indigo-700 font-mono mt-0.5">{item.REFERENCIA}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{item.MARCADESC}{item.COR1DESC ? ` · ${item.COR1DESC}` : ''}</div>
                     </div>
-                    <span className={'px-2.5 py-1 rounded-lg text-xs font-bold ' + totalClass}>{total} peças</span>
+                    <div className="text-right shrink-0">
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        total === 1 ? 'bg-orange-100 text-orange-700' :
+                        total >= 5 ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {total} {total === 1 ? 'peça' : 'peças'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {inStock.map(s => {
-                      const sc = sizeFilter === s ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200';
-                      return (
-                        <span key={s} className={'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ' + sc}>
-                          {s}<span className="text-indigo-400 font-normal">×{item.sizes[s]}</span>
+
+                  {/* Grade de tamanhos */}
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1.5 font-medium">Grade disponível:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sizesInStock.map(s => (
+                        <span
+                          key={s}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            sizeFilter === s
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : 'bg-white text-indigo-700 border-indigo-200'
+                          }`}
+                        >
+                          <span>{s}</span>
+                          <span className="text-indigo-400 font-normal">×{item.sizes[s]}</span>
                         </span>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
             })
-          }
+          )}
         </div>
-        <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-between text-xs text-gray-500">
-          <span>{sizeFilter ? 'Tamanho ' + sizeFilter : 'Todos'}</span>
-          <span className="font-bold text-indigo-700">{filteredItems.reduce((a, i) => a + calculateTotal(i.sizes), 0)} peças</span>
+
+        {/* Footer com resumo */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>
+              {sizeFilter ? (
+                <span>
+                  Mostrando modelos disponíveis no tamanho <span className="font-bold text-indigo-700">{sizeFilter}</span>
+                </span>
+              ) : (
+                <span>Mostrando todos os tamanhos disponíveis</span>
+              )}
+            </span>
+            <span className="font-bold text-indigo-700">
+              {filteredItems.reduce((acc, i) => acc + calculateTotal(i.sizes), 0)} peças no total
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
+// ==========================================
+// 3. COMPONENTE PRINCIPAL
+// ==========================================
 const App = () => {
-  const [activeTab, setActiveTab] = useState(() => { const p = new URLSearchParams(window.location.search); const t = p.get('tab'); return ['system','audit','dashboard','marketing','viability','goals','hr'].includes(t) ? t : 'audit'; });
-  const navigateTab = (tab) => { setActiveTab(tab); const u = new URL(window.location); u.searchParams.set('tab', tab); window.history.replaceState({}, '', u); };
+  // --- Estados de Interface ---
+  const [activeTab, setActiveTab] = useState('audit'); 
   const [searchTerm, setSearchTerm] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showHistoryImportModal, setShowHistoryImportModal] = useState(false);
@@ -107,558 +288,622 @@ const App = () => {
   const [printMode, setPrintMode] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [marketingSort, setMarketingSort] = useState('recent');
+
+  // --- Estados Dashboard Filtros ---
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [dashboardSizeFilter, setDashboardSizeFilter] = useState('');
   const [dashboardCategoryFilter, setDashboardCategoryFilter] = useState('');
   const [showDashboardFilters, setShowDashboardFilters] = useState(false);
-  const [expandedMonthRow, setExpandedMonthRow] = useState(null);
+  const [expandedMonthRow, setExpandedMonthRow] = useState(null); // for seller drill-down in projection table
+  
+  // --- Estados de Negócio ---
   const [selectedStore, setSelectedStore] = useState('10');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [importTargetStore, setImportTargetStore] = useState('10');
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
-  const [systemData, setSystemData] = useState([]);
-  const [auditData, setAuditData] = useState([]);
-  const [completedIds, setCompletedIds] = useState(new Set());
-  const [marketingStatus, setMarketingStatus] = useState({});
-  const [marketingPhotos, setMarketingPhotos] = useState({});
-  const [marketingPostedAt, setMarketingPostedAt] = useState({});
-  const [salesHistory, setSalesHistory] = useState([]);
-  const [sellerOverrides, setSellerOverrides] = useState({});
-  const [projectionSellers, setProjectionSellers] = useState({});
-  const [dreValues, setDreValues] = useState({});
-  const [dreSaveStatus, setDreSaveStatus] = useState('idle');
-  const [dbLoading, setDbLoading] = useState(true);
-  const [userRole, setUserRole] = useState(null);
-  const [userStoreAccess, setUserStoreAccess] = useState([]);
-  const [session, setSession] = useState(undefined);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [forgotSent, setForgotSent] = useState(false);
-  const [showForgot, setShowForgot] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [hrCandidates, setHrCandidates] = useState([]);
-  const [hrFilter, setHrFilter] = useState('all');
-  const [hrSearch, setHrSearch] = useState('');
-  const [hrExpanded, setHrExpanded] = useState(new Set());
-  const [hrImportText, setHrImportText] = useState('');
-  const [showHrImportModal, setShowHrImportModal] = useState(false);
+  
+  // --- Estados Persistentes ---
+  const [systemData, setSystemData] = useState(() => {
+     try { return JSON.parse(localStorage.getItem('stock_systemData')) || initialMockData; } catch { return initialMockData; }
+  });
+  const [auditData, setAuditData] = useState(() => {
+     try {
+       const saved = localStorage.getItem('stock_auditData');
+       if (saved) return JSON.parse(saved);
+       return initialMockData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: 0 }));
+     } catch { return []; }
+  });
+  const [completedIds, setCompletedIds] = useState(() => {
+     try { return new Set(JSON.parse(localStorage.getItem('stock_completedIds'))); } catch { return new Set(); }
+  });
+  const [marketingStatus, setMarketingStatus] = useState(() => {
+     try { return JSON.parse(localStorage.getItem('stock_marketingStatus')) || {}; } catch { return {}; }
+  });
+  const [salesHistory, setSalesHistory] = useState(() => {
+     try { return JSON.parse(localStorage.getItem('stock_salesHistory')) || []; } catch { return []; }
+  });
+  const [sellerOverrides, setSellerOverrides] = useState(() => {
+      try { return JSON.parse(localStorage.getItem('stock_sellerOverrides')) || {}; } catch { return {}; }
+  });
+  const [projectionSellers, setProjectionSellers] = useState(() => {
+     try { return JSON.parse(localStorage.getItem('stock_projectionSellers')) || {}; } catch { return {}; }
+  });
+  const [dreValues, setDreValues] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('stock_dreValues')) || {}; } catch { return {}; }
+  });
+  // Goals tab: manual seller count override for quick scenario testing
   const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
+  // Goals tab: selected seller names for chip-based count
   const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
-  const dreSaveTimer = useRef(null);
-  const photoInputRef = useRef(null);
-  const [photoUploadKey, setPhotoUploadKey] = useState(null);
 
-  const dbToItem = (r) => ({ id: r.item_id, MARCA: r.marca, MARCADESC: r.marcadesc, TIPODESC: r.tipodesc, REFERENCIA: r.referencia, COR1DESC: r.cor1desc, DATAENTRADA: r.dataentrada, sizes: r.sizes || {}, QTDE: r.qtde || 0 });
-  const itemToDb = (item, sc) => ({ store_code: sc || selectedStore, item_id: item.id, marca: item.MARCA, marcadesc: item.MARCADESC, tipodesc: item.TIPODESC, referencia: item.REFERENCIA, cor1desc: item.COR1DESC, dataentrada: item.DATAENTRADA, sizes: item.sizes || {}, qtde: item.QTDE || 0, updated_at: new Date().toISOString() });
-  const dbToSale = (r) => ({ storeCode: r.store_code, sellerCode: r.seller_code, sellerName: r.seller_name, daysWorked: r.days_worked, salesCount: r.sales_count, itemsCount: r.items_count, pa: r.pa, totalSales: r.total_sales, ticketAvg: r.ticket_avg, period: r.period });
-  const saleToDb = (s) => ({ store_code: s.storeCode, seller_code: s.sellerCode, seller_name: s.sellerName, days_worked: s.daysWorked, sales_count: s.salesCount, items_count: s.itemsCount, pa: s.pa, total_sales: s.totalSales, ticket_avg: s.ticketAvg, period: s.period });
+  // --- Efeitos de Salvamento ---
+  useEffect(() => { localStorage.setItem('stock_systemData', JSON.stringify(systemData)); }, [systemData]);
+  useEffect(() => { localStorage.setItem('stock_auditData', JSON.stringify(auditData)); }, [auditData]);
+  useEffect(() => { localStorage.setItem('stock_completedIds', JSON.stringify([...completedIds])); }, [completedIds]);
+  useEffect(() => { localStorage.setItem('stock_marketingStatus', JSON.stringify(marketingStatus)); }, [marketingStatus]);
+  useEffect(() => { localStorage.setItem('stock_salesHistory', JSON.stringify(salesHistory)); }, [salesHistory]);
+  useEffect(() => { localStorage.setItem('stock_sellerOverrides', JSON.stringify(sellerOverrides)); }, [sellerOverrides]);
+  useEffect(() => { localStorage.setItem('stock_projectionSellers', JSON.stringify(projectionSellers)); }, [projectionSellers]);
+  useEffect(() => { localStorage.setItem('stock_dreValues', JSON.stringify(dreValues)); }, [dreValues]);
 
-  const loadAllData = async () => {
-    setDbLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-      const { data: storeAccess } = await supabase.from('user_store_access').select('store_code').eq('user_id', user.id);
-      const role = profile?.role || 'manager_limited'; const stores = storeAccess?.map(r => r.store_code) || [];
-      setUserRole(role); setUserStoreAccess(stores);
-      if (role !== 'owner' && stores.length > 0) setSelectedStore(stores[0]);
-      await Promise.all([loadSystemData(), loadAuditData(), loadSalesHistory(), loadDreValues(), loadProjectionSellers(), loadMarketingStatus(), loadCompletedIds(), loadSellerOverrides(), loadHrCandidates()]);
-    } finally { setDbLoading(false); }
-  };
-  const loadSystemData = async () => { const { data } = await supabase.from('system_data').select('*').order('item_id'); if (data) setSystemData(data.map(dbToItem)); };
-  const loadAuditData = async () => { const { data } = await supabase.from('audit_data').select('*').order('item_id'); if (data) setAuditData(data.map(dbToItem)); };
-  const loadSalesHistory = async () => { const { data } = await supabase.from('sales_history').select('*'); if (data) setSalesHistory(data.map(dbToSale)); };
-  const loadDreValues = async () => { const { data } = await supabase.from('dre_values').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.dre_key] = r.values; }); setDreValues(obj); } };
-  const loadProjectionSellers = async () => { const { data } = await supabase.from('projection_sellers').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.projection_key] = r.seller_count; }); setProjectionSellers(obj); } };
-  const loadMarketingStatus = async () => {
-    const { data } = await supabase.from('marketing_status').select('*');
-    if (data) {
-      const obj = {}; const photos = {}; const postedAt = {};
-      data.forEach(r => { obj[r.item_key] = { photo: r.photo, catalog: r.catalog, posted: r.posted, discontinued: r.discontinued }; if (r.photo_url) photos[r.item_key] = r.photo_url; if (r.posted_at) postedAt[r.item_key] = r.posted_at; });
-      setMarketingStatus(obj); setMarketingPhotos(photos); setMarketingPostedAt(postedAt);
+  useEffect(() => {
+    if (auditData.length === 0 && systemData.length > 0) {
+      const initialAudit = systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: 0 }));
+      setAuditData(initialAudit);
     }
-  };
-  const loadCompletedIds = async () => { const { data } = await supabase.from('completed_ids').select('item_id'); if (data) setCompletedIds(new Set(data.map(r => r.item_id))); };
-  const loadSellerOverrides = async () => { const { data } = await supabase.from('seller_overrides').select('*'); if (data) { const obj = {}; data.forEach(r => { obj[r.override_key] = r.status; }); setSellerOverrides(obj); } };
-  const loadHrCandidates = async () => { const { data } = await supabase.from('hr_candidates').select('*').order('id', { ascending: false }); if (data) setHrCandidates(data); };
+  }, [systemData.length]);
 
+  // Limpar dados de meses futuros
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => { setSession(s); if (s) loadAllData(); else setDbLoading(false); });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => { setSession(s); if (s) loadAllData(); else setDbLoading(false); });
-    return () => subscription.unsubscribe();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const cleanedHistory = salesHistory.filter(h => {
+      const [year, month] = h.period.split('-').map(Number);
+      return year < currentYear || (year === currentYear && month <= currentMonth);
+    });
+    if (cleanedHistory.length !== salesHistory.length) setSalesHistory(cleanedHistory);
   }, []);
-  const loadStoreData = async () => { await Promise.all([loadSystemData(), loadAuditData(), loadMarketingStatus(), loadCompletedIds(), loadSellerOverrides()]); };
-  useEffect(() => {
-    if (salesHistory.length === 0) return;
-    const now = new Date(); const cy = now.getFullYear(), cm = now.getMonth() + 1;
-    const cleaned = salesHistory.filter(h => { const [y, m] = h.period.split('-').map(Number); return y < cy || (y === cy && m <= cm); });
-    if (cleaned.length !== salesHistory.length) setSalesHistory(cleaned);
-  }, [salesHistory.length]);
 
+  // --- Lógica de Negócio ---
   const filterData = useCallback((data) => {
-    if (!data) return []; const t = searchTerm.toLowerCase();
-    return data.filter(item => (item.REFERENCIA||"").toLowerCase().includes(t)||(item.MARCADESC||"").toLowerCase().includes(t)||(item.TIPODESC||"").toLowerCase().includes(t)||(item.COR1DESC||"").toLowerCase().includes(t));
+    if (!data) return [];
+    const t = searchTerm.toLowerCase();
+    return data.filter(item => 
+      (item.REFERENCIA || "").toLowerCase().includes(t) ||
+      (item.MARCADESC || "").toLowerCase().includes(t) ||
+      (item.TIPODESC || "").toLowerCase().includes(t) ||
+      (item.COR1DESC || "").toLowerCase().includes(t)
+    );
   }, [searchTerm]);
 
-  const getSellerStatus = (storeId, month, year, sellerName, daysWorked) => { const key = `${storeId}-${month}-${year}-${sellerName}`; if (sellerOverrides[key]) return sellerOverrides[key]; if (daysWorked >= 5 && !sellerName.toUpperCase().includes('EXTRA')) return 'active'; return 'extra'; };
-  const toggleSellerStatus = async (storeId, month, year, sellerName, currentStatus) => { const key = `${storeId}-${month}-${year}-${sellerName}`; const ns = currentStatus === 'active' ? 'extra' : 'active'; setSellerOverrides(prev => ({ ...prev, [key]: ns })); await supabase.from('seller_overrides').upsert({ store_code: storeId, override_key: key, status: ns, updated_at: new Date().toISOString() }, { onConflict: 'store_code,override_key' }); };
-  const getHistoricalDataForStorePeriod = (storeId, month, year) => { const periodKey = `${year}-${String(month).padStart(2,'0')}`; return salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey); };
-  const hasHistoricalData = (storeId, month, year) => getHistoricalDataForStorePeriod(storeId, month, year).length > 0;
-  const calculateTrend = (storeId, month) => {
-    const salesData = [2021,2022,2023,2024,2025,2026].map(y => ({ year: y, sales: getHistoricalDataForStorePeriod(storeId, month, y).reduce((a,r) => a+r.totalSales,0) })).filter(d => d.sales > 0);
-    if (salesData.length < 2) return { trend: 'neutral', percent: 0, arrow: '→' };
-    let tot = 0, valid = 0;
-    for (let i = 1; i < salesData.length; i++) { const g = ((salesData[i].sales-salesData[i-1].sales)/salesData[i-1].sales)*100; if (Math.abs(g)<50){tot+=g;valid++;} }
-    const avg = valid > 0 ? tot/valid : 0;
-    if (avg > 3) return { trend: 'up', percent: avg, arrow: '↗' };
-    if (avg < -3) return { trend: 'down', percent: avg, arrow: '↘' };
-    return { trend: 'neutral', percent: avg, arrow: '→' };
+  const getSellerStatus = (storeId, month, year, sellerName, daysWorked) => {
+      const key = `${storeId}-${month}-${year}-${sellerName}`;
+      if (sellerOverrides[key]) return sellerOverrides[key];
+      if (daysWorked >= 5 && !sellerName.toUpperCase().includes('EXTRA')) return 'active';
+      return 'extra';
   };
-  const hasAllYearsData = (storeId, month) => [2021,2022,2023,2024,2025,2026].every(y => hasHistoricalData(storeId,month,y));
+
+  const toggleSellerStatus = (storeId, month, year, sellerName, currentStatus) => {
+      const key = `${storeId}-${month}-${year}-${sellerName}`;
+      const newStatus = currentStatus === 'active' ? 'extra' : 'active';
+      setSellerOverrides(prev => ({ ...prev, [key]: newStatus }));
+  };
+
+  const getHistoricalDataForStorePeriod = (storeId, month, year) => {
+    const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+    return salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey);
+  };
+
+  const hasHistoricalData = (storeId, month, year) => getHistoricalDataForStorePeriod(storeId, month, year).length > 0;
+
+  const calculateTrend = (storeId, month) => {
+    const years = [2021, 2022, 2023, 2024, 2025, 2026];
+    const salesData = years.map(y => {
+      const sales = getHistoricalDataForStorePeriod(storeId, month, y).reduce((acc, r) => acc + r.totalSales, 0);
+      return { year: y, sales };
+    }).filter(d => d.sales > 0);
+    if (salesData.length < 2) return { trend: 'neutral', percent: 0, arrow: '→' };
+    let totalGrowth = 0, validComparisons = 0;
+    for (let i = 1; i < salesData.length; i++) {
+      const growth = ((salesData[i].sales - salesData[i-1].sales) / salesData[i-1].sales) * 100;
+      if (Math.abs(growth) < 50) { totalGrowth += growth; validComparisons++; }
+    }
+    const avgGrowth = validComparisons > 0 ? totalGrowth / validComparisons : 0;
+    if (avgGrowth > 3) return { trend: 'up', percent: avgGrowth, arrow: '↗' };
+    if (avgGrowth < -3) return { trend: 'down', percent: avgGrowth, arrow: '↘' };
+    return { trend: 'neutral', percent: avgGrowth, arrow: '→' };
+  };
+
+  const hasAllYearsData = (storeId, month) => {
+    return [2021, 2022, 2023, 2024, 2025, 2026].every(year => hasHistoricalData(storeId, month, year));
+  };
+
   const getFinancialData = (storeId, month, year) => {
     const config = STORE_CONFIGS[storeId] || STORE_CONFIGS['10'];
     const history = getHistoricalDataForStorePeriod(storeId, month, year);
-    const activeSellers = history.length > 0 ? history.filter(h => getSellerStatus(storeId, month, year, h.sellerName, h.daysWorked) === 'active').length : config.collaborators;
-    const totalFixed = Object.values(config.fixedCosts).reduce((a,b)=>a+b,0);
-    const totalVariablePercent = Object.values(config.variableCosts).reduce((a,b)=>a+b,0);
+    let activeSellers = history.length > 0
+      ? history.filter(h => getSellerStatus(storeId, month, year, h.sellerName, h.daysWorked) === 'active').length
+      : config.collaborators;
+    const totalFixed = Object.values(config.fixedCosts).reduce((a, b) => a + b, 0);
+    const totalVariablePercent = Object.values(config.variableCosts).reduce((a, b) => a + b, 0);
     const contributionMargin = 100 - totalVariablePercent;
     const marginRate = contributionMargin / 100;
     const breakEven = marginRate > 0 ? totalFixed / marginRate : 0;
-    const realTotalSales = history.reduce((acc,curr)=>acc+curr.totalSales,0);
+    const goalPerSeller = activeSellers > 0 ? breakEven / activeSellers : 0;
+    const realTotalSales = history.reduce((acc, curr) => acc + curr.totalSales, 0);
     const surplus = realTotalSales - breakEven;
     const profit = surplus > 0 ? surplus * marginRate : 0;
-    return { totalFixed, totalVariablePercent, contributionMargin, breakEven, goalPerSeller: activeSellers>0?breakEven/activeSellers:0, activeSellers, realTotalSales, surplus, profit, config };
-  };
-  const getGoalsData = (storeId, month, numSellersOverride) => {
-    const cy = new Date().getFullYear();
-    const fin = getFinancialData(storeId, month, cy);
-    const { breakEven, activeSellers } = fin;
-    const n = numSellersOverride != null ? numSellersOverride : (activeSellers > 0 ? activeSellers : 1);
-    const rawLast3 = [2023,2024,2025].map(y => { const pk = `${y}-${String(month).padStart(2,'0')}`; return salesHistory.filter(h=>h.storeCode==storeId&&h.period===pk).reduce((a,r)=>a+r.totalSales,0); });
-    const valid3 = rawLast3.filter(v=>v>10000);
-    const media = valid3.length > 0 ? valid3.reduce((a,b)=>a+b,0)/valid3.length : 0;
-    const allS = [2021,2022,2023,2024,2025,2026].map(y => { const pk=`${y}-${String(month).padStart(2,'0')}`; return salesHistory.filter(h=>h.storeCode==storeId&&h.period===pk).reduce((a,r)=>a+r.totalSales,0); }).filter(v=>v>10000);
-    const recorde = allS.length > 0 ? Math.max(...allS) : 0;
-    const maior3 = valid3.length > 0 ? Math.max(...valid3) : 0;
-    const fVend = media > 0 ? maior3/media : 1;
-    const base = media > 0 ? media : breakEven;
-    const bInd = roundToSpecial((base*fVend*0.80)/n);
-    const bLoja = roundToSpecial(bInd*n);
-    const pInd = roundToSpecial(Math.min(Math.max((base*1.10)/n,bInd),recorde>0?(recorde*1.05)/n:Infinity));
-    const pLoja = roundToSpecial(Math.max(pInd*n,bLoja));
-    const oLoja = roundToSpecial(Math.max(Math.max(breakEven,media>0?media*1.15*1.02:0),pLoja));
-    const oInd = roundToSpecial(Math.min(Math.max(Math.max(20000,oLoja/n),pInd),recorde>0?(recorde*1.15)/n:Infinity));
-    const histData = [2021,2022,2023,2024,2025].map(y=>{const pk=`${y}-${String(month).padStart(2,'0')}`;return{year:y,total:salesHistory.filter(h=>h.storeCode==storeId&&h.period===pk).reduce((a,r)=>a+r.totalSales,0)};});
-    return { metaBronzeInd:bInd,metaBronzeLoja:bLoja,metaPrataInd:pInd,metaPrataLoja:pLoja,metaOuroInd:oInd,metaOuroLoja:oLoja,mediaUltimos3Anos:media,recorde,fVend,breakEven,contributionMarginRate:fin.contributionMargin/100,totalFixed:fin.totalFixed,historicalData:histData,activeSellers:n,metaConservadora:oLoja,metaBronze:bInd,metaPrataIndividual:pInd };
+    return { totalFixed, totalVariablePercent, contributionMargin, breakEven, goalPerSeller, activeSellers, realTotalSales, surplus, profit, config };
   };
 
-  const filteredSystemData = useMemo(()=>filterData(systemData),[systemData,filterData]);
-  const filteredAuditData = useMemo(()=>filterData(auditData),[auditData,filterData]);
-  const differences = useMemo(()=>{
-    return systemData.map(sys=>{
-      const audit=auditData.find(a=>a.id===sys.id); if(!audit) return null;
-      const diffs={}; let has=false;
-      sizeColumns.forEach(s=>{const d=(parseInt(audit.sizes[s])||0)-(sys.sizes[s]||0);if(d!==0){diffs[s]=d;has=true;}});
-      const auditTotal=calculateTotal(audit.sizes);
-      return{...sys,diffSizes:diffs,hasDifference:has,auditTotal,diffTotal:auditTotal-sys.QTDE};
-    }).filter(i=>i&&i.hasDifference);
-  },[systemData,auditData]);
-  const exits = differences.filter(d=>d.diffTotal<0&&!completedIds.has(d.id));
-  const entries = differences.filter(d=>d.diffTotal>0&&!completedIds.has(d.id));
-  const dashboardStats = useMemo(()=>{
-    const cs={}; const ci={};
-    auditData.forEach(item=>{
-      const cat=item.TIPODESC||"OUTROS";
-      if(!cs[cat]){cs[cat]={total:0,sizes:{}};ci[cat]=[];sizeColumns.forEach(s=>cs[cat].sizes[s]=0);}
-      const it=calculateTotal(item.sizes);
-      if(it>0){cs[cat].total+=it;ci[cat].push(item);sizeColumns.forEach(size=>{if((parseInt(item.sizes[size])||0)>0)cs[cat].sizes[size]+=(parseInt(item.sizes[size])||0);});}
+  const getGoalsData = (storeId, month, numSellersOverride) => {
+    const currentYear = new Date().getFullYear();
+    const currentFinancial = getFinancialData(storeId, month, currentYear);
+    const { breakEven, activeSellers } = currentFinancial;
+    const numSellers = numSellersOverride != null ? numSellersOverride : (activeSellers > 0 ? activeSellers : 1);
+
+    // === HISTÓRICO ÚLTIMOS 3 ANOS ===
+    const last3Years = [2023, 2024, 2025];
+    const last3YearsRaw = last3Years.map(y => {
+      const periodKey = `${y}-${String(month).padStart(2, '0')}`;
+      return salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey)
+        .reduce((acc, r) => acc + r.totalSales, 0);
     });
-    const sc=Object.entries(cs).sort(([,a],[,b])=>b.total-a.total);
-    const lp=auditData.filter(i=>calculateTotal(i.sizes)===1).sort((a,b)=>(a.TIPODESC||"").localeCompare(b.TIPODESC||""));
-    const hs=auditData.filter(i=>calculateTotal(i.sizes)>=5).sort((a,b)=>b.QTDE-a.QTDE);
-    const ti=auditData.length; const tp=auditData.reduce((a,i)=>a+calculateTotal(i.sizes),0);
-    return{sortedCategories:sc,categoryItems:ci,lastPieces:lp,heavyStock:hs,totalItems:ti,totalPieces:tp,avgPiecesPerItem:ti>0?(tp/ti).toFixed(1):0,zeroStock:auditData.filter(i=>calculateTotal(i.sizes)===0).length};
-  },[auditData]);
-  const allAvailableSizes = useMemo(()=>{const s=new Set();auditData.forEach(i=>{sizeColumns.forEach(c=>{if((parseInt(i.sizes[c])||0)>0)s.add(c);});});return sizeColumns.filter(c=>s.has(c));},[auditData]);
-  const dashboardFilteredItems = useMemo(()=>{
-    if(!dashboardSizeFilter&&!dashboardCategoryFilter) return [];
-    return auditData.filter(item=>{
-      if(calculateTotal(item.sizes)<=0) return false;
-      if(dashboardCategoryFilter&&(item.TIPODESC||'OUTROS')!==dashboardCategoryFilter) return false;
-      if(dashboardSizeFilter&&!((parseInt(item.sizes[dashboardSizeFilter])||0)>0)) return false;
+    const last3YearsValid = last3YearsRaw.filter(v => v > 10000);
+    const mediaUltimos3Anos = last3YearsValid.length > 0
+      ? last3YearsValid.reduce((a, b) => a + b, 0) / last3YearsValid.length
+      : 0;
+
+    // Recorde histórico (todos os anos disponíveis)
+    const allYearsForRecord = [2021, 2022, 2023, 2024, 2025, 2026];
+    const allSales = allYearsForRecord.map(y => {
+      const periodKey = `${y}-${String(month).padStart(2, '0')}`;
+      return salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey)
+        .reduce((acc, r) => acc + r.totalSales, 0);
+    }).filter(v => v > 10000);
+    const recorde = allSales.length > 0 ? Math.max(...allSales) : 0;
+
+    // F_vend: maior dos últimos 3 anos ÷ média dos últimos 3 anos
+    const maiorUltimos3Anos = last3YearsValid.length > 0 ? Math.max(...last3YearsValid) : 0;
+    const fVend = mediaUltimos3Anos > 0 ? maiorUltimos3Anos / mediaUltimos3Anos : 1;
+
+    const baseMedia = mediaUltimos3Anos > 0 ? mediaUltimos3Anos : breakEven;
+
+    // =====================================================
+    // 1. META BRONZE INDIVIDUAL (B_ind) — Lógica 2.1
+    // Fórmula: (Média 3 anos × F_vend × 0.80) ÷ Vendedoras
+    // Fator Newbie 0.80: Bronze é 20% menor que o potencial máx do time
+    // Trava: SEM piso de R$ 20.000
+    // =====================================================
+    const bronzeIndRaw = (baseMedia * fVend * 0.80) / numSellers;
+    const metaBronzeInd = roundToSpecial(bronzeIndRaw);
+
+    // =====================================================
+    // 2. META BRONZE LOJA (B_loja) — Lógica 2.1
+    // Fórmula: B_ind × Vendedoras
+    // =====================================================
+    const metaBronzeLoja = roundToSpecial(metaBronzeInd * numSellers);
+
+    // =====================================================
+    // 3. META PRATA INDIVIDUAL (P_ind) — Lógica 2.1
+    // Fórmula: (Média 3 anos × 1,10) ÷ Vendedoras
+    // Travas: P_ind >= B_ind  e  P_ind <= Recorde × 1,05
+    // =====================================================
+    const prataIndBase = (baseMedia * 1.10) / numSellers;
+    const prataIndMin = metaBronzeInd;
+    const prataIndMax = recorde > 0 ? (recorde * 1.05) / numSellers : Infinity;
+    const metaPrataInd = roundToSpecial(Math.min(Math.max(prataIndBase, prataIndMin), prataIndMax));
+
+    // =====================================================
+    // 4. META PRATA LOJA (P_loja) — Lógica 2.1
+    // Fórmula: P_ind × Vendedoras
+    // Trava: P_loja >= B_loja
+    // =====================================================
+    const prataLojaRaw = metaPrataInd * numSellers;
+    const metaPrataLoja = roundToSpecial(Math.max(prataLojaRaw, metaBronzeLoja));
+
+    // =====================================================
+    // 6. META OURO LOJA (O_loja) — calculada ANTES do individual
+    // Fórmula: MAX(Break-Even ; Média 3 anos × 1,15 × 1,02)
+    // Trava: O_loja >= P_loja
+    // =====================================================
+    const ouroLojaA = breakEven;
+    const ouroLojaB = mediaUltimos3Anos > 0 ? mediaUltimos3Anos * 1.15 * 1.02 : 0;
+    const ouroLojaRaw = Math.max(ouroLojaA, ouroLojaB);
+    const metaOuroLoja = roundToSpecial(Math.max(ouroLojaRaw, metaPrataLoja));
+
+    // =====================================================
+    // 5. META OURO INDIVIDUAL (O_ind)
+    // Fórmula: MAX(20.000 ; O_loja ÷ Vendedoras)
+    // Travas: O_ind >= P_ind  e  O_ind <= Recorde × 1,15
+    // =====================================================
+    const ouroIndBase = Math.max(20000, metaOuroLoja / numSellers);
+    const ouroIndMin = metaPrataInd;
+    const ouroIndMax = recorde > 0 ? (recorde * 1.15) / numSellers : Infinity;
+    const metaOuroInd = roundToSpecial(Math.min(Math.max(ouroIndBase, ouroIndMin), ouroIndMax));
+
+    // === HISTÓRICO PARA O GRÁFICO ===
+    const historyYears = [2021, 2022, 2023, 2024, 2025];
+    const historicalData = historyYears.map(y => {
+      const periodKey = `${y}-${String(month).padStart(2, '0')}`;
+      const records = salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey);
+      return { year: y, total: records.reduce((acc, r) => acc + r.totalSales, 0) };
+    });
+
+    return {
+      metaBronzeInd, metaBronzeLoja,
+      metaPrataInd,  metaPrataLoja,
+      metaOuroInd,   metaOuroLoja,
+      // auxiliares
+      mediaUltimos3Anos, recorde, fVend, breakEven,
+      contributionMarginRate: currentFinancial.contributionMargin / 100,
+      totalFixed: currentFinancial.totalFixed,
+      historicalData,
+      activeSellers: numSellers,
+      // compat legada (DRE)
+      metaConservadora: metaOuroLoja,
+      metaBronze: metaBronzeInd,
+      metaPrataIndividual: metaPrataInd,
+    };
+  };
+
+  // --- Memos ---
+  const filteredSystemData = useMemo(() => filterData(systemData), [systemData, filterData]);
+  const filteredAuditData = useMemo(() => filterData(auditData), [auditData, filterData]);
+
+  const differences = useMemo(() => {
+    return systemData.map(sys => {
+      const audit = auditData.find(a => a.id === sys.id);
+      if (!audit) return null;
+      const diffs = {};
+      let has = false;
+      sizeColumns.forEach(s => {
+        const d = (parseInt(audit.sizes[s]) || 0) - (sys.sizes[s] || 0);
+        if (d !== 0) { diffs[s] = d; has = true; }
+      });
+      const auditTotal = calculateTotal(audit.sizes);
+      return { ...sys, diffSizes: diffs, hasDifference: has, auditTotal, diffTotal: auditTotal - sys.QTDE };
+    }).filter(i => i && i.hasDifference);
+  }, [systemData, auditData]);
+
+  const exits = differences.filter(d => d.diffTotal < 0 && !completedIds.has(d.id));
+  const entries = differences.filter(d => d.diffTotal > 0 && !completedIds.has(d.id));
+
+  const dashboardStats = useMemo(() => {
+    const categoryStats = {};
+    const categoryItems = {}; // itens por categoria
+    auditData.forEach(item => {
+      const category = item.TIPODESC || "OUTROS";
+      if (!categoryStats[category]) {
+        categoryStats[category] = { total: 0, sizes: {} };
+        categoryItems[category] = [];
+        sizeColumns.forEach(s => categoryStats[category].sizes[s] = 0);
+      }
+      const itemTotal = calculateTotal(item.sizes);
+      if (itemTotal > 0) {
+        categoryStats[category].total += itemTotal;
+        categoryItems[category].push(item);
+        sizeColumns.forEach(size => {
+          if ((parseInt(item.sizes[size]) || 0) > 0) categoryStats[category].sizes[size] += (parseInt(item.sizes[size]) || 0);
+        });
+      }
+    });
+    const sortedCategories = Object.entries(categoryStats).sort(([, a], [, b]) => b.total - a.total);
+    const lastPieces = auditData.filter(item => calculateTotal(item.sizes) === 1).sort((a, b) => (a.TIPODESC || "").localeCompare(b.TIPODESC || ""));
+    const heavyStock = auditData.filter(item => calculateTotal(item.sizes) >= 5).sort((a, b) => b.QTDE - a.QTDE);
+    const totalItems = auditData.length;
+    const totalPieces = auditData.reduce((acc, item) => acc + calculateTotal(item.sizes), 0);
+    const avgPiecesPerItem = totalItems > 0 ? (totalPieces / totalItems).toFixed(1) : 0;
+    const zeroStock = auditData.filter(item => calculateTotal(item.sizes) === 0).length;
+    return { sortedCategories, categoryItems, lastPieces, heavyStock, totalItems, totalPieces, avgPiecesPerItem, zeroStock };
+  }, [auditData]);
+
+  // Tamanhos disponíveis no estoque inteiro (para filtro global)
+  const allAvailableSizes = useMemo(() => {
+    const sizeSet = new Set();
+    auditData.forEach(item => {
+      sizeColumns.forEach(s => {
+        if ((parseInt(item.sizes[s]) || 0) > 0) sizeSet.add(s);
+      });
+    });
+    return sizeColumns.filter(s => sizeSet.has(s));
+  }, [auditData]);
+
+  // Itens filtrados pelo painel de filtros global do dashboard
+  const dashboardFilteredItems = useMemo(() => {
+    if (!dashboardSizeFilter && !dashboardCategoryFilter) return [];
+    return auditData.filter(item => {
+      const total = calculateTotal(item.sizes);
+      if (total <= 0) return false;
+      if (dashboardCategoryFilter && (item.TIPODESC || 'OUTROS') !== dashboardCategoryFilter) return false;
+      if (dashboardSizeFilter && !((parseInt(item.sizes[dashboardSizeFilter]) || 0) > 0)) return false;
       return true;
     });
-  },[auditData,dashboardSizeFilter,dashboardCategoryFilter]);
-  const heavyStockToDisplay = printMode ? dashboardStats.heavyStock : dashboardStats.heavyStock.slice(0,20);
-  const marketingItems = useMemo(()=>{
-    let f=auditData.filter(item=>{
-      const stock=calculateTotal(item.sizes); const ms=(item.REFERENCIA||"").toLowerCase().includes(searchTerm.toLowerCase());
-      const key=getItemKey(item); const mst=marketingStatus[key]||{};
-      if(marketingSort==='cleanup') return stock===0&&mst.catalog&&ms;
-      if(mst.discontinued&&marketingSort!=='cleanup') return false;
-      if(marketingSort==='no-photo') return stock>0&&!mst.photo&&ms;
-      if(marketingSort==='no-catalog') return stock>0&&mst.photo&&!mst.catalog&&ms;
-      if(marketingSort==='to-post') return stock>0&&mst.photo&&mst.catalog&&!mst.posted&&ms;
-      return stock>0&&ms;
-    });
-    return f.sort((a,b)=>{if(marketingSort==='recent')return parseDate(b.DATAENTRADA)-parseDate(a.DATAENTRADA);if(marketingSort==='quantity')return calculateTotal(b.sizes)-calculateTotal(a.sizes);return 0;});
-  },[auditData,searchTerm,marketingStatus,marketingSort]);
+  }, [auditData, dashboardSizeFilter, dashboardCategoryFilter]);
 
-  // ── HANDLERS ──────────────────────────────────────────────
+  const heavyStockToDisplay = printMode ? dashboardStats.heavyStock : dashboardStats.heavyStock.slice(0, 20);
+
+  // --- Handlers ---
   const handleAuditChange = useCallback((id, size, value) => {
-    const nv = value===''?0:(parseInt(value)||0);
-    setAuditData(prev=>prev.map(item=>{if(item.id!==id)return item;const ns={...item.sizes,[size]:nv};const nq=calculateTotal(ns);supabase.from('audit_data').update({sizes:ns,qtde:nq,updated_at:new Date().toISOString()}).eq('store_code',selectedStore).eq('item_id',id);return{...item,sizes:ns,QTDE:nq};}));
-  },[selectedStore]);
-  const confirmFillAuditWithSystem = async () => { const filled=systemData.map(item=>({...item,sizes:{...item.sizes},QTDE:calculateTotal(item.sizes)}));setAuditData(filled);setShowResetModal(false);await supabase.from('audit_data').delete().eq('store_code',selectedStore);if(filled.length>0)await supabase.from('audit_data').insert(filled.map(i=>itemToDb(i,selectedStore))); };
-  const toggleCompleted = async (itemId) => { const ns=new Set(completedIds);if(ns.has(itemId)){ns.delete(itemId);await supabase.from('completed_ids').delete().eq('store_code',selectedStore).eq('item_id',itemId);}else{ns.add(itemId);await supabase.from('completed_ids').insert({store_code:selectedStore,item_id:itemId});}setCompletedIds(ns); };
-  const toggleCategory = (category) => { const ns=new Set(expandedCategories);ns.has(category)?ns.delete(category):ns.add(category);setExpandedCategories(ns); };
+    const newValue = value === "" ? "" : parseInt(value);
+    setAuditData(prev => prev.map(item => item.id === id ? { ...item, sizes: { ...item.sizes, [size]: newValue }, QTDE: calculateTotal({ ...item.sizes, [size]: newValue }) } : item));
+  }, []);
 
-  // SPRINT 3: toggleMarketing with posted_at timestamp
-  const toggleMarketing = async (key, field) => {
-    const cur=marketingStatus[key]||{};
-    const upd={...cur,[field]:!cur[field]};
-    const now=new Date().toISOString();
-    const newPostedAt={...marketingPostedAt};
-    if(field==='posted'&&!cur[field]) newPostedAt[key]=now;
-    if(field==='posted'&&cur[field]) delete newPostedAt[key];
-    setMarketingStatus(prev=>({...prev,[key]:upd}));
-    setMarketingPostedAt(newPostedAt);
-    await supabase.from('marketing_status').upsert({
-      store_code:selectedStore,item_key:key,
-      photo:upd.photo||false,catalog:upd.catalog||false,posted:upd.posted||false,discontinued:upd.discontinued||false,
-      posted_at:newPostedAt[key]||null,
-      photo_url:marketingPhotos[key]||null,
-      updated_at:now
-    },{onConflict:'store_code,item_key'});
+  const confirmFillAuditWithSystem = () => {
+    setAuditData(systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) })));
+    setShowResetModal(false);
+  };
+  const toggleCompleted = (splitId) => { const newSet = new Set(completedIds); newSet.has(splitId) ? newSet.delete(splitId) : newSet.add(splitId); setCompletedIds(newSet); };
+  const toggleCategory = (category) => { const newSet = new Set(expandedCategories); newSet.has(category) ? newSet.delete(category) : newSet.add(category); setExpandedCategories(newSet); };
+  const toggleMarketing = (key, field) => { setMarketingStatus(prev => ({...prev, [key]: { ...prev[key], [field]: !prev[key]?.[field] }})); };
+  
+  const processImport = () => {
+      try {
+        const rows = importText.trim().split('\n'); if (rows.length < 2) return;
+        const headers = rows[0].split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ',')).map(h => h.trim().toUpperCase());
+        const parsed = rows.slice(1).map((row, idx) => {
+            const vals = row.split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ','));
+            const item = { id: idx + 1, sizes: {} };
+            headers.forEach((h, i) => { if (sizeColumns.includes(h)) item.sizes[h] = parseInt(vals[i]) || 0; else item[h] = vals[i]; });
+            sizeColumns.forEach(s => { if (item.sizes[s] === undefined) item.sizes[s] = 0; });
+            item.QTDE = calculateTotal(item.sizes);
+            item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || "GENERICO"; item.TIPODESC = item.TIPODESC || "OUTROS";
+            return item;
+        });
+        setSystemData(parsed); 
+        setAuditData(parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return {...i, sizes: z, QTDE: 0}; }));
+        setCompletedIds(new Set()); setShowImportModal(false); setImportText(""); alert("Importado!");
+      } catch { alert("Erro importação"); }
   };
 
-  // SPRINT 3: photo upload handler
-  const handlePhotoUpload = async (key, file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target.result;
-      setMarketingPhotos(prev=>({...prev,[key]:dataUrl}));
-      const upd={...marketingStatus[key]||{},photo:true};
-      setMarketingStatus(prev=>({...prev,[key]:upd}));
-      await supabase.from('marketing_status').upsert({
-        store_code:selectedStore,item_key:key,
-        photo:true,catalog:upd.catalog||false,posted:upd.posted||false,discontinued:upd.discontinued||false,
-        photo_url:dataUrl,
-        posted_at:marketingPostedAt[key]||null,
-        updated_at:new Date().toISOString()
-      },{onConflict:'store_code,item_key'});
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // SPRINT 3: DRE auto-save with debounce
-  const updateDreValue = (dreKey, field, value) => {
-    const upd={...(dreValues[dreKey]||{}),[field]:parseFloat(value)||0};
-    setDreValues(prev=>({...prev,[dreKey]:upd}));
-    setDreSaveStatus('saving');
-    if(dreSaveTimer.current) clearTimeout(dreSaveTimer.current);
-    dreSaveTimer.current = setTimeout(async()=>{
-      await supabase.from('dre_values').upsert({store_code:selectedStore,dre_key:dreKey,values:upd,updated_at:new Date().toISOString()},{onConflict:'store_code,dre_key'});
-      setDreSaveStatus('saved');
-      setTimeout(()=>setDreSaveStatus('idle'),2000);
-    },800);
-  };
-
-  // SPRINT 3: Export DRE as formatted HTML printable
-  const exportDrePdf = (dreKey, finData, dreVals, receitaBruta) => {
-    const store = STORE_CONFIGS[selectedStore]?.name || selectedStore;
-    const period = `${getMonthName(selectedMonth)}/${selectedYear}`;
-    const cmv = receitaBruta*(dreVals.percCMV??finData.config.variableCosts.cmv)/100;
-    const lucroBruto = receitaBruta-cmv;
-    const impostos = receitaBruta*(dreVals.percImpostos??finData.config.variableCosts.imposto)/100;
-    const taxasCartao = receitaBruta*(dreVals.percTaxasCartao??finData.config.variableCosts.taxaCartao)/100;
-    const embalagens = receitaBruta*(dreVals.percEmbalagens??finData.config.variableCosts.embalagem)/100;
-    const obsolescencia = receitaBruta*(dreVals.percObsolescencia??finData.config.variableCosts.obsoleto)/100;
-    const deducoes = impostos+taxasCartao+embalagens+obsolescencia;
-    const receitaLiq = lucroBruto-deducoes;
-    const despFix = (dreVals.aluguel??finData.config.fixedCosts.aluguel)+(dreVals.proLabore??finData.config.fixedCosts.proLabore)+(dreVals.agua??finData.config.fixedCosts.agua)+(dreVals.luz??finData.config.fixedCosts.luz)+(dreVals.internet??finData.config.fixedCosts.internet)+(dreVals.software??finData.config.fixedCosts.software)+(dreVals.contabilidade??finData.config.fixedCosts.contabilidade)+(dreVals.salarios??finData.config.fixedCosts.colaboradoras)+(dreVals.administracao??finData.config.fixedCosts.adm)+(dreVals.alimentacao??finData.config.fixedCosts.alimentacao)+(dreVals.transporte??finData.config.fixedCosts.transporte);
-    const resultado = receitaLiq-despFix;
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DRE ${store} - ${period}</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#1a1a2e;max-width:800px;margin:auto}.header{text-align:center;border-bottom:3px solid #4f46e5;padding-bottom:20px;margin-bottom:30px}h1{color:#4f46e5;margin:0}h2{color:#6b7280;font-size:14px;margin:5px 0}.row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:6px;margin:4px 0}.row.total{background:#f0f0ff;font-weight:bold;border-left:4px solid #4f46e5}.row.positive{background:#ecfdf5;color:#065f46;font-weight:bold;font-size:18px;padding:16px}.row.negative{background:#fef2f2;color:#991b1b;font-weight:bold;font-size:18px;padding:16px}.label{flex:1}.value{font-family:monospace;font-weight:bold}@media print{body{padding:20px}}</style></head><body>
-<div class="header"><h1>DRE — ${store}</h1><h2>${period}</h2><p style="color:#9ca3af;font-size:12px">Gerado em ${new Date().toLocaleString('pt-BR')}</p></div>
-<div class="row total"><span class="label">Receita Bruta de Vendas</span><span class="value">${formatCurrency(receitaBruta)}</span></div>
-<div class="row"><span class="label">(-) CMV (${dreVals.percCMV??finData.config.variableCosts.cmv}%)</span><span class="value" style="color:#dc2626">${formatCurrency(cmv)}</span></div>
-<div class="row total"><span class="label">= Lucro Bruto</span><span class="value">${formatCurrency(lucroBruto)}</span></div>
-<div class="row"><span class="label">(-) Impostos</span><span class="value" style="color:#d97706">${formatCurrency(impostos)}</span></div>
-<div class="row"><span class="label">(-) Taxas Cartão</span><span class="value" style="color:#d97706">${formatCurrency(taxasCartao)}</span></div>
-<div class="row"><span class="label">(-) Embalagens</span><span class="value" style="color:#d97706">${formatCurrency(embalagens)}</span></div>
-<div class="row"><span class="label">(-) Obsolescência</span><span class="value" style="color:#d97706">${formatCurrency(obsolescencia)}</span></div>
-<div class="row total"><span class="label">= Receita Líquida</span><span class="value">${formatCurrency(receitaLiq)}</span></div>
-<div class="row"><span class="label">(-) Total Despesas Fixas</span><span class="value" style="color:#7c3aed">${formatCurrency(despFix)}</span></div>
-<div class="row ${resultado>=0?'positive':'negative'}"><span class="label">${resultado>=0?'LUCRO':'PREJUÍZO'} OPERACIONAL</span><span class="value">${formatCurrency(Math.abs(resultado))}</span></div>
-<p style="text-align:center;color:#9ca3af;font-size:11px;margin-top:40px">Nova ParetoOS · Relatório confidencial</p>
-</body></html>`;
-    const w = window.open('','_blank');
-    w.document.write(html);
-    w.document.close();
-    setTimeout(()=>w.print(),500);
-  };
-
-  const processImport = async () => {
+  const processSalesHistoryImport = () => {
+    const now = new Date();
+    if (selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth() + 1)) {
+        alert("Não é possível importar dados de meses futuros."); return;
+    }
     try {
-      const rows=importText.trim().split('\n');if(rows.length<2)return;
-      const sep=rows[0].includes('\t')?'\t':(rows[0].includes(';')?';':',');
-      const headers=rows[0].split(sep).map(h=>h.trim().toUpperCase());
-      const parsed=rows.slice(1).map((row,idx)=>{const vals=row.split(sep);const item={id:idx+1,sizes:{}};headers.forEach((h,i)=>{if(sizeColumns.includes(h))item.sizes[h]=parseInt(vals[i])||0;else item[h]=vals[i];});sizeColumns.forEach(s=>{if(item.sizes[s]===undefined)item.sizes[s]=0;});item.QTDE=calculateTotal(item.sizes);item.REFERENCIA=item.REFERENCIA||`ITEM-${idx}`;item.MARCADESC=item.MARCADESC||'GENERICO';item.TIPODESC=item.TIPODESC||'OUTROS';return item;});
-      await supabase.from('system_data').delete().eq('store_code',importTargetStore);
-      if(parsed.length>0)await supabase.from('system_data').insert(parsed.map(i=>itemToDb(i,importTargetStore)));
-      setSystemData(parsed);
-      // SPRINT 2: Don't overwrite existing audit counts - only add new items with zero
-      const existingAuditMap=new Map(auditData.map(a=>[a.id,a]));
-      const mergedAudit=parsed.map(i=>{
-        const existing=existingAuditMap.get(i.id);
-        if(existing)return existing; // preserve existing counts!
-        const z={};sizeColumns.forEach(s=>z[s]=0);return{...i,sizes:z,QTDE:0};
-      });
-      await supabase.from('audit_data').delete().eq('store_code',importTargetStore);
-      if(mergedAudit.length>0)await supabase.from('audit_data').insert(mergedAudit.map(i=>itemToDb(i,importTargetStore)));
-      setAuditData(mergedAudit);
-      setShowImportModal(false);setImportText('');
-      alert(`Importado! ${parsed.length} itens. Contagens existentes preservadas.`);
-    } catch(e){console.error(e);alert('Erro importação');}
-  };
-
-  const processSalesHistoryImport = async () => {
-    const now=new Date();
-    if(selectedYear>now.getFullYear()||(selectedYear===now.getFullYear()&&selectedMonth>now.getMonth()+1)){alert('Não é possível importar dados de meses futuros.');return;}
-    try {
-      const period=`${selectedYear}-${String(selectedMonth).padStart(2,'0')}`;
-      const rows=historyImportText.trim().split('\n');
-      const newEntries=rows.map(row=>{const cols=row.split('\t');if(cols.length<5||isNaN(parseInt(cols[0])))return null;return{storeCode:importTargetStore,sellerCode:cols[1]?.trim(),sellerName:cols[2]?.trim(),daysWorked:parseInt(cols[3])||0,salesCount:parseInt(cols[4])||0,itemsCount:parseInt(cols[6])||0,pa:parseFloat(cols[8]?.replace(',','.'))||0,totalSales:parseCurrency(cols[10]),ticketAvg:parseCurrency(cols[12]),period};}).filter(Boolean);
-      await supabase.from('sales_history').delete().eq('store_code',importTargetStore).eq('period',period);
-      const base=salesHistory.filter(h=>!(h.period===period&&h.storeCode===importTargetStore));
-      if(newEntries.length>0)await supabase.from('sales_history').insert(newEntries.map(saleToDb));
-      setSalesHistory([...base,...newEntries]);
-      setShowHistoryImportModal(false);setHistoryImportText('');setClearBeforeImport(false);
-      alert('Histórico importado!');
-    } catch(e){console.error(e);alert('Erro importação histórico');}
+      const rows = historyImportText.trim().split('\n');
+      const newEntries = rows.map(row => {
+        const cols = row.split('\t');
+        if (cols.length < 5 || isNaN(parseInt(cols[0]))) return null;
+        return {
+          storeCode: importTargetStore,
+          sellerCode: cols[1]?.trim(),
+          sellerName: cols[2]?.trim(),
+          daysWorked: parseInt(cols[3]) || 0,
+          salesCount: parseInt(cols[4]) || 0,
+          itemsCount: parseInt(cols[6]) || 0,
+          pa: parseFloat(cols[8]?.replace(',', '.')) || 0,
+          totalSales: parseCurrency(cols[10]),
+          ticketAvg: parseCurrency(cols[12]),
+          period: `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+        };
+      }).filter(Boolean);
+      let cleaned = salesHistory;
+      if (clearBeforeImport) {
+        cleaned = salesHistory.filter(h => !(h.period === `${selectedYear}-${String(selectedMonth).padStart(2, '0')}` && h.storeCode === importTargetStore));
+      } else {
+        cleaned = salesHistory.filter(h => !newEntries.some(n => n.period === h.period && n.sellerName === h.sellerName && n.storeCode === h.storeCode));
+      }
+      setSalesHistory([...cleaned, ...newEntries]); 
+      setShowHistoryImportModal(false); 
+      setHistoryImportText(""); 
+      setClearBeforeImport(false);
+      alert("Histórico Importado com Sucesso!");
+    } catch { alert("Erro importação histórico"); }
   };
 
   const handleExport = () => {
-    if(differences.length===0){alert("Sem dados");return;}
-    const csv="data:text/csv;charset=utf-8,REFERENCIA;QTDE\n"+auditData.map(i=>`${i.REFERENCIA};${i.QTDE}`).join("\n");
-    const link=document.createElement("a");link.setAttribute("href",encodeURI(csv));link.setAttribute("download","estoque.csv");document.body.appendChild(link);link.click();document.body.removeChild(link);
+    if (differences.length === 0) { alert("Sem dados"); return; }
+    const csvContent = "data:text/csv;charset=utf-8,REFERENCIA;QTDE\n" + auditData.map(i => `${i.REFERENCIA};${i.QTDE}`).join("\n");
+    const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", "estoque.csv");
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // ── AUTH HANDLERS (SPRINT 1) ───────────────────────────────
-  const handleLogin = async (e) => {
-    e.preventDefault(); setLoginError(''); setLoginLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
-    if (error) setLoginError(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message);
-    setLoginLoading(false);
-  };
-  const handleGoogleLogin = async () => {
-    setLoginLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-    if (error) { setLoginError(error.message); setLoginLoading(false); }
-  };
-  const handleForgotPassword = async (e) => {
-    e.preventDefault(); setLoginLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo: `${window.location.origin}?reset=true` });
-    if (!error) setForgotSent(true);
-    else setLoginError(error.message);
-    setLoginLoading(false);
-  };
+  const marketingItems = useMemo(() => {
+    let filtered = auditData.filter(item => {
+      const stock = calculateTotal(item.sizes);
+      const matchesSearch = (item.REFERENCIA || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const key = getItemKey(item);
+      const mStatus = marketingStatus[key] || {};
+      if (marketingSort === 'cleanup') return stock === 0 && mStatus.catalog && matchesSearch;
+      if (mStatus.discontinued && marketingSort !== 'cleanup') return false;
+      if (marketingSort === 'no-photo') return stock > 0 && !mStatus.photo && matchesSearch;
+      if (marketingSort === 'no-catalog') return stock > 0 && mStatus.photo && !mStatus.catalog && matchesSearch;
+      if (marketingSort === 'to-post') return stock > 0 && mStatus.photo && mStatus.catalog && !mStatus.posted && matchesSearch;
+      return stock > 0 && matchesSearch;
+    });
+    return filtered.sort((a, b) => {
+      if (marketingSort === 'recent') return parseDate(b.DATAENTRADA) - parseDate(a.DATAENTRADA);
+      if (marketingSort === 'quantity') return calculateTotal(b.sizes) - calculateTotal(a.sizes);
+      return 0;
+    });
+  }, [auditData, searchTerm, marketingStatus, marketingSort]);
 
-  // HR import
-  const processHrImport = async () => {
-    const lines=hrImportText.trim().split('\n').filter(Boolean);
-    if(lines.length===0){alert('Cole os dados antes de processar');return;}
-    const normDate=(s)=>{
-      if(!s||s.trim()===''||s.trim()==='-'||s.trim()==='—')return null;
-      const v=s.trim().split(' ')[0];
-      if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);
-      const parts=v.split('/');
-      if(parts.length===3){const[a,b,y]=parts;if(y.length===4){let d=parseInt(a),m=parseInt(b);if(m>12){const tmp=d;d=m;m=tmp;}return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}}
-      return null;
-    };
-    const isCandidateLine=(line)=>{
-      if(!line.includes('\t'))return false;
-      const col=line.split('\t');if(col.length<3)return false;
-      const name=(col[0]||'').trim();if(!name||name.length<2)return false;
-      if(name.startsWith('['))return false;if(/^\d/.test(name))return false;
-      if(/^(candidato|nome|data|status|telefone|fonte)/i.test(name))return false;
-      if(['Rua ','Av.','Avenida','Período','TRUE','FALSE'].some(kw=>name.includes(kw)))return false;
-      const ph=(col[1]||'').replace(/\D/g,'');return ph.length>=8;
-    };
-    const entries=lines.filter(isCandidateLine).map(line=>{
-      const col=line.split('\t');const candidato=col[0]?.trim()||'';if(!candidato)return null;
-      const col19=(col[19]||'').trim();const isBool=col19.toUpperCase()==='TRUE'||col19.toUpperCase()==='FALSE';
-      const responsavel=isBool?(col[20]?.trim()||null):(col19||col[20]?.trim()||null);
-      return{store_code:selectedStore,candidato,telefone:col[1]?.trim()||null,recebimento_curriculo:normDate(col[2]),data_resposta:normDate(col[3]),status_processo:col[4]?.trim()||null,motivo_detalhes:col[5]?.trim()||null,entrevista_agendada:normDate(col[6]),nota_interna:col[12]?.trim()||null,fonte_captacao:col[13]?.trim()||null,observacoes:col[14]?.trim()||null,retornou:col[16]?.trim()?.toUpperCase()==='TRUE',interessado:col[17]?.trim()?.toUpperCase()==='TRUE',recusa:col[18]?.trim()?.toUpperCase()==='TRUE',desvio:isBool&&col19.toUpperCase()==='TRUE',responsavel,whatsapp:col[21]?.trim()||null,etapa_maxima:col[25]?.trim()||null,macro_status_final:col[26]?.trim()||null,gargalo:col[27]?.trim()||null};
-    }).filter(e=>e&&e.candidato);
-    if(entries.length===0){alert('Nenhum candidato encontrado');return;}
-    const{error}=await supabase.from('hr_candidates').insert(entries);
-    if(error){alert('Erro: '+error.message);return;}
-    await loadHrCandidates();setShowHrImportModal(false);setHrImportText('');
-    alert(entries.length+' candidato(s) importado(s)!');
-  };
-
-  // ── RENDER: DIFFERENCE TABLE ───────────────────────────────
+  // --- RENDERIZAÇÃO COMPONENTES ---
   const GroupedDifferenceTable = ({ items, title, icon: Icon, colorClass, bgClass, isExit }) => {
-    if(!items||items.length===0)return null;
-    const grouped=items.reduce((acc,item)=>{const k=item.TIPODESC||"OUTROS";if(!acc[k])acc[k]=[];acc[k].push(item);return acc;},{});
-    const sc=isExit?'text-red-600':'text-green-600';
-    return(
-      <div className={`rounded-xl border mb-4 ${colorClass} shadow-sm`}>
-        <div className={`p-3 border-b flex items-center gap-2 ${bgClass}`}><Icon className="w-5 h-5"/><span className="font-bold">{title}</span><span className="ml-auto text-xs bg-white/50 px-2 rounded">{items.length}</span></div>
-        <div className="p-2 space-y-1">
-          {Object.entries(grouped).map(([group,gItems])=>(
-            <div key={group}>
-              <div className="text-xs font-bold text-gray-500 uppercase mt-2 mb-1 px-1">{group}</div>
-              {gItems.map(i=>{const sd=sizeColumns.filter(s=>i.diffSizes[s]!==undefined&&i.diffSizes[s]!==0);return(
-                <div key={i.id} className="text-sm flex justify-between border-b p-1 last:border-0 hover:bg-white/50">
-                  <span className="font-medium">{i.REFERENCIA} <span className="text-xs text-gray-400">({i.COR1DESC})</span></span>
-                  <div className="flex gap-2">{sd.map(s=><span key={s} className="text-xs bg-white border px-1.5 py-0.5 rounded-md"><span className={`font-bold ${sc}`}>{s}</span>: <span>{i.diffSizes[s]>0?'+':''}{i.diffSizes[s]}</span></span>)}</div>
-                </div>
-              );})}
-            </div>
-          ))}
-        </div>
+    if (!items || items.length === 0) return null;
+    const grouped = items.reduce((acc, item) => {
+        const groupKey = item.TIPODESC || "OUTROS";
+        if (!acc[groupKey]) acc[groupKey] = [];
+        acc[groupKey].push(item);
+        return acc;
+    }, {});
+    const sizeColorClass = isExit ? 'text-red-600' : 'text-green-600';
+    return (
+      <div className={`rounded-xl border mb-4 ${colorClass} print:border-none shadow-sm`}>
+         <div className={`p-3 border-b flex items-center gap-2 ${bgClass}`}><Icon className="w-5 h-5"/> <span className="font-bold">{title}</span> <span className="ml-auto text-xs bg-white/50 px-2 rounded">{items.length}</span></div>
+         <div className="p-2 space-y-1">
+             {Object.entries(grouped).map(([group, groupItems]) => (
+                 <div key={group}>
+                     <div className="text-xs font-bold text-gray-500 uppercase mt-2 mb-1 px-1">{group}</div>
+                     {groupItems.map(i => {
+                       const sizesWithDiff = sizeColumns.filter(s => i.diffSizes[s] !== undefined && i.diffSizes[s] !== 0);
+                       return (
+                         <div key={i.id} className="text-sm flex justify-between border-b p-1 last:border-0 hover:bg-white/50 transition-colors">
+                             <span className="font-medium">{i.REFERENCIA} <span className="text-xs text-gray-400">({i.COR1DESC})</span></span>
+                             <div className="flex gap-2">
+                               {sizesWithDiff.map(s => (
+                                 <span key={s} className="text-xs bg-white border px-1.5 py-0.5 rounded-md">
+                                   <span className={`font-bold ${sizeColorClass}`}>{s}</span>: <span className="text-black">{i.diffSizes[s] > 0 ? '+' : ''}{i.diffSizes[s]}</span>
+                                 </span>
+                               ))}
+                             </div>
+                         </div>
+                       );
+                     })}
+                 </div>
+             ))}
+         </div>
       </div>
     );
   };
 
-  // ── RENDER: DRE TAB ───────────────────────────────────────
   const renderViabilityTab = () => {
-    const finData=getFinancialData(selectedStore,selectedMonth,selectedYear);
-    const goalsData=getGoalsData(selectedStore,selectedMonth);
-    const currentData=getHistoricalDataForStorePeriod(selectedStore,selectedMonth,selectedYear);
-    const totalSalesMonth=currentData.reduce((acc,curr)=>acc+curr.totalSales,0);
-    const dreKey=`${selectedStore}-${selectedMonth}-${selectedYear}`;
-    const savedDre=dreValues[dreKey]||{};
-    const receitaBruta=totalSalesMonth;
-    const percCMV=savedDre.percCMV??finData.config.variableCosts.cmv;
-    const percImpostos=savedDre.percImpostos??finData.config.variableCosts.imposto;
-    const percTaxasCartao=savedDre.percTaxasCartao??finData.config.variableCosts.taxaCartao;
-    const percEmbalagens=savedDre.percEmbalagens??finData.config.variableCosts.embalagem;
-    const percObsolescencia=savedDre.percObsolescencia??finData.config.variableCosts.obsoleto;
-    const cmv=receitaBruta*(percCMV/100);
-    const lucroBruto=receitaBruta-cmv;
-    const margemBruta=receitaBruta>0?(lucroBruto/receitaBruta)*100:0;
-    const impostos=receitaBruta*(percImpostos/100);
-    const taxasCartao=receitaBruta*(percTaxasCartao/100);
-    const embalagens=receitaBruta*(percEmbalagens/100);
-    const obsolescencia=receitaBruta*(percObsolescencia/100);
-    const deducoesReceita=impostos+taxasCartao+embalagens+obsolescencia;
-    const receitaLiquida=lucroBruto-deducoesReceita;
-    const margemLiquida=receitaBruta>0?(receitaLiquida/receitaBruta)*100:0;
-    const aluguel=savedDre.aluguel??finData.config.fixedCosts.aluguel;
-    const proLabore=savedDre.proLabore??finData.config.fixedCosts.proLabore;
-    const agua=savedDre.agua??finData.config.fixedCosts.agua;
-    const luz=savedDre.luz??finData.config.fixedCosts.luz;
-    const internet=savedDre.internet??finData.config.fixedCosts.internet;
-    const software=savedDre.software??finData.config.fixedCosts.software;
-    const contabilidade=savedDre.contabilidade??finData.config.fixedCosts.contabilidade;
-    const salarios=savedDre.salarios??finData.config.fixedCosts.colaboradoras;
-    const administracao=savedDre.administracao??finData.config.fixedCosts.adm;
-    const alimentacao=savedDre.alimentacao??finData.config.fixedCosts.alimentacao;
-    const transporte=savedDre.transporte??finData.config.fixedCosts.transporte;
-    const totalDespesasFixas=aluguel+proLabore+agua+luz+internet+software+contabilidade+salarios+administracao+alimentacao+transporte;
-    const resultadoOperacional=receitaLiquida-totalDespesasFixas;
-    const margemOperacional=receitaBruta>0?(resultadoOperacional/receitaBruta)*100:0;
-    const breakEvenDiff=receitaBruta-finData.breakEven;
-    const metaLojaDiff=receitaBruta-goalsData.metaConservadora;
-
-    // SPRINT 3: DRE save indicator
-    const SaveIndicator = () => (
-      <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all ${dreSaveStatus==='saving'?'bg-yellow-100 text-yellow-700':dreSaveStatus==='saved'?'bg-green-100 text-green-700':'opacity-0'}`}>
-        {dreSaveStatus==='saving'?<><Loader2 className="w-3 h-3 animate-spin"/>Salvando...</>:dreSaveStatus==='saved'?<><CheckCircle className="w-3 h-3"/>Salvo</>:null}
-      </div>
-    );
+    const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
+    const goalsData = getGoalsData(selectedStore, selectedMonth);
+    const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
+    const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
+    const dreKey = `${selectedStore}-${selectedMonth}-${selectedYear}`;
+    const savedDre = dreValues[dreKey] || {};
+    const updateDreValue = (field, value) => {
+      setDreValues(prev => ({ ...prev, [dreKey]: { ...prev[dreKey], [field]: parseFloat(value) || 0 } }));
+    };
+    const receitaBruta = totalSalesMonth;
+    const percCMV = savedDre.percCMV ?? finData.config.variableCosts.cmv;
+    const percImpostos = savedDre.percImpostos ?? finData.config.variableCosts.imposto;
+    const percTaxasCartao = savedDre.percTaxasCartao ?? finData.config.variableCosts.taxaCartao;
+    const percEmbalagens = savedDre.percEmbalagens ?? finData.config.variableCosts.embalagem;
+    const percObsolescencia = savedDre.percObsolescencia ?? finData.config.variableCosts.obsoleto;
+    const cmv = receitaBruta * (percCMV / 100);
+    const lucroBruto = receitaBruta - cmv;
+    const margemBruta = receitaBruta > 0 ? (lucroBruto / receitaBruta) * 100 : 0;
+    const impostos = receitaBruta * (percImpostos / 100);
+    const taxasCartao = receitaBruta * (percTaxasCartao / 100);
+    const embalagens = receitaBruta * (percEmbalagens / 100);
+    const obsolescencia = receitaBruta * (percObsolescencia / 100);
+    const deducoesReceita = impostos + taxasCartao + embalagens + obsolescencia;
+    const receitaLiquida = lucroBruto - deducoesReceita;
+    const margemLiquida = receitaBruta > 0 ? (receitaLiquida / receitaBruta) * 100 : 0;
+    const aluguel = savedDre.aluguel ?? finData.config.fixedCosts.aluguel;
+    const proLabore = savedDre.proLabore ?? finData.config.fixedCosts.proLabore;
+    const agua = savedDre.agua ?? finData.config.fixedCosts.agua;
+    const luz = savedDre.luz ?? finData.config.fixedCosts.luz;
+    const internet = savedDre.internet ?? finData.config.fixedCosts.internet;
+    const software = savedDre.software ?? finData.config.fixedCosts.software;
+    const contabilidade = savedDre.contabilidade ?? finData.config.fixedCosts.contabilidade;
+    const salarios = savedDre.salarios ?? finData.config.fixedCosts.colaboradoras;
+    const administracao = savedDre.administracao ?? finData.config.fixedCosts.adm;
+    const alimentacao = savedDre.alimentacao ?? finData.config.fixedCosts.alimentacao;
+    const transporte = savedDre.transporte ?? finData.config.fixedCosts.transporte;
+    const totalDespesasFixas = aluguel + proLabore + agua + luz + internet + software + contabilidade + salarios + administracao + alimentacao + transporte;
+    const resultadoOperacional = receitaLiquida - totalDespesasFixas;
+    const margemOperacional = receitaBruta > 0 ? (resultadoOperacional / receitaBruta) * 100 : 0;
+    const breakEvenDiff = receitaBruta - finData.breakEven;
+    const breakEvenPercent = finData.breakEven > 0 ? (breakEvenDiff / finData.breakEven) * 100 : 0;
+    const metaLojaDiff = receitaBruta - goalsData.metaConservadora;
+    const metaLojaPercent = goalsData.metaConservadora > 0 ? (metaLojaDiff / goalsData.metaConservadora) * 100 : 0;
 
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-br from-white to-emerald-50/30 p-6 rounded-2xl border border-emerald-100 shadow-lg no-print">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-emerald-800 flex items-center gap-2"><PieChart className="w-6 h-6"/> DRE</h2>
-            <div className="flex items-center gap-3">
-              <SaveIndicator/>
-              {/* SPRINT 3: Export DRE button */}
-              <button onClick={()=>exportDrePdf(dreKey,finData,savedDre,receitaBruta)} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all">
-                <FileText className="w-4 h-4"/> Exportar DRE
-              </button>
+          <div className="bg-gradient-to-br from-white to-emerald-50/30 p-6 rounded-2xl border border-emerald-100 shadow-lg no-print">
+            <h2 className="text-2xl font-bold text-emerald-800 flex items-center gap-2 mb-4"><PieChart className="w-6 h-6"/> DRE - Demonstração do Resultado do Exercício</h2>
+            <div className="flex gap-4">
+               <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Object.entries(STORE_CONFIGS).map(([k,v]) => <option key={k} value={k}>{v.name}</option>)}</select>
+               <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{getMonthName(i+1)}</option>)}</select>
+               <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:5},(_,i)=><option key={i} value={2023+i}>{2023+i}</option>)}</select>
             </div>
           </div>
-          <div className="flex gap-4">
-            <select value={selectedStore} onChange={e=>setSelectedStore(e.target.value)} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Object.entries(STORE_CONFIGS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}</select>
-            <select value={selectedMonth} onChange={e=>setSelectedMonth(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{getMonthName(i+1)}</option>)}</select>
-            <select value={selectedYear} onChange={e=>setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:5},(_,i)=><option key={i} value={2023+i}>{2023+i}</option>)}</select>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className={`p-6 rounded-2xl text-white shadow-xl ${resultadoOperacional >= 0 ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-700' : 'bg-gradient-to-br from-red-500 via-red-600 to-red-800'}`}>
+                <h3 className="text-sm opacity-90 font-medium">Resultado Operacional</h3>
+                <div className="text-4xl font-bold mt-1">{formatCurrency(resultadoOperacional)}</div>
+                <div className="mt-4 pt-4 border-t border-white/30">
+                  <div className="flex justify-between text-sm"><span className="opacity-90">Margem:</span><span className="font-bold">{margemOperacional.toFixed(2)}%</span></div>
+                  <div className="flex justify-between text-xs mt-1 opacity-75"><span>Receita Bruta:</span><span>{formatCurrency(receitaBruta)}</span></div>
+                </div>
+             </div>
+             <div className="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-2xl shadow-xl">
+                <h3 className="text-sm opacity-90 font-medium">Break Even</h3>
+                <div className="text-3xl font-bold mt-1">{formatCurrency(finData.breakEven)}</div>
+                <div className="mt-4 pt-4 border-t border-white/30 text-xs">
+                  <div className="flex justify-between"><span>Resultado vs BE:</span><span className="font-bold">{breakEvenDiff >= 0 ? '+' : ''}{formatCurrency(breakEvenDiff)}</span></div>
+                  <div className="flex justify-between mt-1 opacity-75"><span>Variação:</span><span>{breakEvenPercent.toFixed(1)}%</span></div>
+                </div>
+             </div>
+             <div className="bg-gradient-to-br from-indigo-500 to-purple-700 text-white p-6 rounded-2xl shadow-xl">
+                <h3 className="text-sm opacity-90 font-medium">🥇 Meta Ouro (Loja)</h3>
+                <div className="text-3xl font-bold mt-1">{formatCurrency(goalsData.metaConservadora)}</div>
+                <div className="mt-4 pt-4 border-t border-white/30 text-xs">
+                  <div className="flex justify-between"><span>Resultado vs Meta:</span><span className="font-bold">{metaLojaDiff >= 0 ? '+' : ''}{formatCurrency(metaLojaDiff)}</span></div>
+                  <div className="flex justify-between mt-1 opacity-75"><span>Variação:</span><span>{metaLojaPercent.toFixed(1)}%</span></div>
+                </div>
+             </div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className={`p-6 rounded-2xl text-white shadow-xl ${resultadoOperacional>=0?'bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-700':'bg-gradient-to-br from-red-500 via-red-600 to-red-800'}`}>
-            <h3 className="text-sm opacity-90 font-medium">Resultado Operacional</h3>
-            <div className="text-4xl font-bold mt-1">{formatCurrency(resultadoOperacional)}</div>
-            <div className="mt-4 pt-4 border-t border-white/30 text-sm"><div className="flex justify-between"><span>Margem:</span><span className="font-bold">{margemOperacional.toFixed(2)}%</span></div></div>
-          </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-2xl shadow-xl">
-            <h3 className="text-sm opacity-90 font-medium">Break Even</h3>
-            <div className="text-3xl font-bold mt-1">{formatCurrency(finData.breakEven)}</div>
-            <div className="mt-4 pt-4 border-t border-white/30 text-xs"><div className="flex justify-between"><span>vs BE:</span><span className="font-bold">{breakEvenDiff>=0?'+':''}{formatCurrency(breakEvenDiff)}</span></div></div>
-          </div>
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-700 text-white p-6 rounded-2xl shadow-xl">
-            <h3 className="text-sm opacity-90 font-medium">🥇 Meta Ouro (Loja)</h3>
-            <div className="text-3xl font-bold mt-1">{formatCurrency(goalsData.metaConservadora)}</div>
-            <div className="mt-4 pt-4 border-t border-white/30 text-xs"><div className="flex justify-between"><span>vs Meta:</span><span className="font-bold">{metaLojaDiff>=0?'+':''}{formatCurrency(metaLojaDiff)}</span></div></div>
-          </div>
-        </div>
-        <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-lg">
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-md"><div className="flex justify-between items-center"><span className="font-bold text-lg">1. Receita Bruta</span><span className="font-bold text-3xl">{formatCurrency(receitaBruta)}</span></div></div>
-            <div className="ml-6 bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
-              <div className="flex justify-between items-center mb-2"><span className="font-semibold text-red-900">(-) CMV</span><span className="font-bold text-xl text-red-900">{formatCurrency(cmv)}</span></div>
-              <div className="flex items-center gap-2 text-sm"><span className="text-red-700">%:</span><input type="number" step="0.01" value={percCMV} onChange={e=>updateDreValue(dreKey,'percCMV',e.target.value)} className="w-20 border border-red-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-red-400"/><span className="text-red-700">%</span></div>
-            </div>
-            <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-5 rounded-xl shadow-md"><div className="flex justify-between items-center"><div><div className="font-bold text-lg">2. Lucro Bruto</div><div className="text-sm opacity-90">{margemBruta.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(lucroBruto)}</span></div></div>
-            <div className="ml-6 space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                {[['Impostos','percImpostos',impostos,'imposto'],['Taxas Cartão','percTaxasCartao',taxasCartao,'taxaCartao'],['Embalagens','percEmbalagens',embalagens,'embalagem'],['Obsolescência','percObsolescencia',obsolescencia,'obsoleto']].map(([label,field,val,cfgKey])=>(
-                  <div key={field} className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                    <div className="flex justify-between items-center mb-2"><span className="text-sm font-semibold text-orange-900">{label}</span><span className="font-bold text-orange-900">{formatCurrency(val)}</span></div>
-                    <div className="flex items-center gap-2 text-xs"><input type="number" step="0.01" value={savedDre[field]??finData.config.variableCosts[cfgKey]} onChange={e=>updateDreValue(dreKey,field,e.target.value)} className="w-16 border border-orange-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-orange-400"/><span className="text-orange-700">%</span></div>
+          <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-lg">
+              <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-md">
+                      <div className="flex justify-between items-center"><span className="font-bold text-lg">1. Receita Bruta de Vendas</span><span className="font-bold text-3xl">{formatCurrency(receitaBruta)}</span></div>
                   </div>
-                ))}
-              </div>
-              <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg border border-orange-300"><span className="font-bold text-orange-900">Total Deduções</span><span className="font-bold text-xl text-orange-900">{formatCurrency(deducoesReceita)}</span></div>
-            </div>
-            <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-5 rounded-xl shadow-md"><div className="flex justify-between items-center"><div><div className="font-bold text-lg">3. Receita Líquida</div><div className="text-sm opacity-90">{margemLiquida.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(receitaLiquida)}</span></div></div>
-            <div className="ml-6 space-y-3">
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                {[['Aluguel','aluguel',aluguel],['Pró-labore','proLabore',proLabore],['Salários','salarios',salarios],['Água','agua',agua],['Luz','luz',luz],['Internet','internet',internet],['Software','software',software],['Contabilidade','contabilidade',contabilidade],['Administração','administracao',administracao],['Alimentação','alimentacao',alimentacao],['Transporte','transporte',transporte]].map(([label,field,val])=>(
-                  <div key={field} className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                    <div className="text-xs text-purple-700 mb-1">{label}</div>
-                    <input type="number" step="0.01" value={val} onChange={e=>updateDreValue(dreKey,field,e.target.value)} className="w-full border border-purple-300 rounded px-2 py-1.5 font-mono font-bold text-purple-900 focus:ring-2 focus:ring-purple-400"/>
+                  <div className="ml-6 bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
+                      <div className="flex justify-between items-center mb-2"><span className="font-semibold text-red-900">(-) Custo da Mercadoria Vendida (CMV)</span><span className="font-bold text-xl text-red-900">{formatCurrency(cmv)}</span></div>
+                      <div className="flex items-center gap-2 text-sm"><span className="text-red-700">Percentual:</span><input type="number" step="0.01" value={percCMV} onChange={e => updateDreValue('percCMV', e.target.value)} className="w-20 border border-red-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-red-400"/><span className="text-red-700">%</span></div>
                   </div>
-                ))}
+                  <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-5 rounded-xl shadow-md">
+                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">2. Lucro Bruto</div><div className="text-sm opacity-90">Margem: {margemBruta.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(lucroBruto)}</span></div>
+                  </div>
+                  <div className="ml-6 space-y-3">
+                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Deduções da Receita:</div>
+                      <div className="grid grid-cols-2 gap-4">
+                          {[['Impostos','percImpostos',impostos,'orange'],['Taxas Cartão','percTaxasCartao',taxasCartao,'orange'],['Embalagens','percEmbalagens',embalagens,'orange'],['Obsolescência','percObsolescencia',obsolescencia,'orange']].map(([label, field, val]) => (
+                            <div key={field} className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                                <div className="flex justify-between items-center mb-2"><span className="text-sm font-semibold text-orange-900">{label}</span><span className="font-bold text-orange-900">{formatCurrency(val)}</span></div>
+                                <div className="flex items-center gap-2 text-xs"><input type="number" step="0.01" value={savedDre[field] ?? finData.config.variableCosts[field === 'percImpostos' ? 'imposto' : field === 'percTaxasCartao' ? 'taxaCartao' : field === 'percEmbalagens' ? 'embalagem' : 'obsoleto']} onChange={e => updateDreValue(field, e.target.value)} className="w-16 border border-orange-300 rounded px-2 py-1 text-center font-mono focus:ring-2 focus:ring-orange-400"/><span className="text-orange-700">%</span></div>
+                            </div>
+                          ))}
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg border border-orange-300"><span className="font-bold text-orange-900">Total Deduções</span><span className="font-bold text-xl text-orange-900">{formatCurrency(deducoesReceita)}</span></div>
+                  </div>
+                  <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-5 rounded-xl shadow-md">
+                      <div className="flex justify-between items-center"><div><div className="font-bold text-lg">3. Receita Líquida</div><div className="text-sm opacity-90">Margem: {margemLiquida.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(receitaLiquida)}</span></div>
+                  </div>
+                  <div className="ml-6 space-y-3">
+                      <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Despesas Operacionais:</div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                          {[['Aluguel','aluguel',aluguel],['Pró-labore','proLabore',proLabore],['Salários + Encargos','salarios',salarios],['Água','agua',agua],['Luz','luz',luz],['Internet','internet',internet],['Software','software',software],['Contabilidade','contabilidade',contabilidade],['Administração','administracao',administracao],['Alimentação','alimentacao',alimentacao],['Transporte','transporte',transporte]].map(([label, field, val]) => (
+                            <div key={field} className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                <div className="text-xs text-purple-700 mb-1">{label}</div>
+                                <input type="number" step="0.01" value={val} onChange={e => updateDreValue(field, e.target.value)} className="w-full border border-purple-300 rounded px-2 py-1.5 font-mono font-bold text-purple-900 focus:ring-2 focus:ring-purple-400"/>
+                            </div>
+                          ))}
+                      </div>
+                      <div className="flex justify-between items-center p-4 bg-purple-100 rounded-lg border border-purple-300"><span className="font-bold text-purple-900">Total Despesas Fixas</span><span className="font-bold text-2xl text-purple-900">{formatCurrency(totalDespesasFixas)}</span></div>
+                  </div>
+                  <div className={`p-6 rounded-xl shadow-xl border-4 ${resultadoOperacional >= 0 ? 'bg-gradient-to-r from-emerald-600 to-green-700 border-emerald-400' : 'bg-gradient-to-r from-red-600 to-red-800 border-red-400'} text-white`}>
+                      <div className="flex justify-between items-center">
+                          <div><div className="text-xl font-bold mb-1">4. {resultadoOperacional >= 0 ? 'LUCRO' : 'PREJUÍZO'} OPERACIONAL</div><div className="text-sm opacity-90">Margem Operacional: {margemOperacional.toFixed(2)}%</div></div>
+                          <span className="font-bold text-5xl">{formatCurrency(Math.abs(resultadoOperacional))}</span>
+                      </div>
+                  </div>
+                  <div className="mt-6 p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-blue-200">
+                      <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-600"/> Indicadores de Performance</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                          {[['Margem Bruta', margemBruta, 'green'],['Margem Líquida', margemLiquida, 'teal'],['Margem Operacional', margemOperacional, resultadoOperacional >= 0 ? 'emerald' : 'red'],['CMV / Receita', percCMV, 'red'],['Desp. Fixas / Receita', receitaBruta > 0 ? (totalDespesasFixas/receitaBruta*100) : 0, 'purple']].map(([label, val, color]) => (
+                            <div key={label} className="text-center p-3 bg-white rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-600 mb-1">{label}</div>
+                                <div className={`text-2xl font-bold text-${color}-700`}>{parseFloat(val).toFixed(1)}%</div>
+                            </div>
+                          ))}
+                      </div>
+                  </div>
               </div>
-              <div className="flex justify-between items-center p-4 bg-purple-100 rounded-lg border border-purple-300"><span className="font-bold text-purple-900">Total Despesas Fixas</span><span className="font-bold text-2xl text-purple-900">{formatCurrency(totalDespesasFixas)}</span></div>
-            </div>
-            <div className={`p-6 rounded-xl shadow-xl border-4 ${resultadoOperacional>=0?'bg-gradient-to-r from-emerald-600 to-green-700 border-emerald-400':'bg-gradient-to-r from-red-600 to-red-800 border-red-400'} text-white`}>
-              <div className="flex justify-between items-center"><div><div className="text-xl font-bold mb-1">4. {resultadoOperacional>=0?'LUCRO':'PREJUÍZO'} OPERACIONAL</div><div className="text-sm opacity-90">{margemOperacional.toFixed(2)}%</div></div><span className="font-bold text-5xl">{formatCurrency(Math.abs(resultadoOperacional))}</span></div>
-            </div>
-            <div className="mt-6 p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-blue-200">
-              <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-600"/> Indicadores</h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {[['Margem Bruta',margemBruta,'green'],['Margem Líquida',margemLiquida,'teal'],['Margem Operacional',margemOperacional,resultadoOperacional>=0?'emerald':'red'],['CMV/Receita',percCMV,'red'],['Desp.Fix/Receita',receitaBruta>0?(totalDespesasFixas/receitaBruta*100):0,'purple']].map(([label,val,color])=>(
-                  <div key={label} className="text-center p-3 bg-white rounded-lg shadow-sm"><div className="text-xs text-gray-600 mb-1">{label}</div><div className={`text-2xl font-bold text-${color}-700`}>{parseFloat(val).toFixed(1)}%</div></div>
-                ))}
-              </div>
-            </div>
           </div>
-        </div>
       </div>
     );
   };
+
   const renderGoalsTab = () => {
     const effectiveSellers = goalsSellerOverride != null ? goalsSellerOverride : (getFinancialData(selectedStore, selectedMonth, selectedYear).activeSellers || STORE_CONFIGS[selectedStore]?.collaborators || 3);
     const goalsData = getGoalsData(selectedStore, selectedMonth, goalsSellerOverride);
@@ -1797,882 +2042,660 @@ const App = () => {
     );
   };
 
-  // ── RENDER: RH TAB — SPRINT 4 + 5 ───────────────────────
-  const formatDateBR = (s) => {
-    if (!s) return '—';
-    if (s.includes('-')) { const [y,m,d] = s.split('T')[0].split('-'); return d+'/'+m+'/'+y; }
-    return s;
-  };
-
-  // ── Funções utilitárias (hrUtils inline) ─────────────────
-  const HR_STATUS_OPTIONS = ['Banco de Talentos','Em análise','Entrevista agendada','Entrevista realizada','Fase de Teste','Contratado','Recusado','Aguardando retorno','Desistiu'];
-  const HR_FONTE_OPTIONS  = ['Instagram','Indicação','Indeed','LinkedIn','Vitrine','WhatsApp','Outro'];
-  const HR_MOTIVO_OPTIONS = ['—','Não compareceu','Desistiu','Perfil inadequado','Salário incompatível','Sem experiência','Reprovado no teste','Vaga preenchida','Em análise','Aprovado'];
-
-  const hrDiasAteResposta = (c) => {
-    if (!c.recebimento_curriculo || !c.data_resposta) return null;
-    return Math.round((new Date(c.data_resposta) - new Date(c.recebimento_curriculo)) / 86400000);
-  };
-  const hrDiasAteEntrevista = (c) => {
-    if (!c.data_resposta || !c.entrevista_agendada) return null;
-    return Math.round((new Date(c.entrevista_agendada) - new Date(c.data_resposta)) / 86400000);
-  };
-  const hrLinkWA = (tel) => {
-    if (!tel) return null;
-    const n = tel.replace(/\D/g,'');
-    return 'https://wa.me/' + (n.startsWith('55') ? n : '55'+n);
-  };
-  const hrEtapaMaxima = (s) => {
-    if (!s) return '1. Currículo recebido';
-    if (s === 'Contratado')            return '6. Contratado';
-    if (s.includes('Teste'))           return '5. Fase de Teste';
-    if (s === 'Entrevista realizada')  return '4. Entrevista realizada';
-    if (s === 'Entrevista agendada')   return '3. Entrevista agendada';
-    if (s === 'Em análise')            return '2. Em análise';
-    return '1. Currículo recebido';
-  };
-  const hrMacroStatus = (s, m) => {
-    if (!s) return '—';
-    if (s === 'Contratado')                              return '✅ Contratado';
-    if (s === 'Recusado' && m === 'Não compareceu')      return '🚫 No-Show';
-    if (s === 'Recusado' && m === 'Desistiu')            return '🔙 Desistência';
-    if (s === 'Recusado' && m === 'Perfil inadequado')   return '❌ Perfil Inadequado';
-    if (s === 'Recusado' && m === 'Salário incompatível') return '💰 Salário';
-    if (s === 'Recusado' && m === 'Reprovado no teste')  return '📝 Reprovado';
-    if (s === 'Recusado')                                return '❌ Recusado';
-    if (s === 'Fase de Teste')                           return '🧪 Em Teste';
-    if (s === 'Entrevista realizada')                    return '🎙️ Entrevistado';
-    if (s === 'Entrevista agendada')                     return '📅 Agendado';
-    if (s === 'Aguardando retorno')                      return '⏳ Aguardando';
-    if (s === 'Desistiu')                                return '🔙 Desistência';
-    if (s === 'Em análise')                              return '🔍 Em Análise';
-    return '📋 ' + s;
-  };
-  const hrGargalo = (c) => {
-    if (c.recebimento_curriculo && !c.data_resposta) {
-      const h = (Date.now() - new Date(c.recebimento_curriculo).getTime()) / 3600000;
-      if (h > 24) return 'Atraso no retorno';
-    }
-    const dr = hrDiasAteResposta(c);
-    if (dr !== null && dr > 1) return 'Resposta lenta';
-    const de = hrDiasAteEntrevista(c);
-    if (de !== null && de > 7) return 'Entrevista demorada';
-    return null;
-  };
-  const hrAlertaSLA = (c) => {
-    if (!c.recebimento_curriculo || c.data_resposta) return false;
-    return (Date.now() - new Date(c.recebimento_curriculo).getTime()) / 3600000 > 24;
-  };
-  const hrGatilhosStatus = (novoStatus, cand) => {
-    const hoje = new Date().toISOString().split('T')[0];
-    const u = { status_processo: novoStatus, updated_at: new Date().toISOString() };
-    if (['Entrevista agendada','Entrevista realizada'].includes(novoStatus)) {
-      if (!cand.data_resposta)       u.data_resposta       = hoje;
-      if (!cand.entrevista_agendada) u.entrevista_agendada = hoje;
-    }
-    if (['Recusado','Contratado'].includes(novoStatus) && !cand.data_resposta) {
-      u.data_resposta = hoje;
-    }
-    u.etapa_maxima       = hrEtapaMaxima(novoStatus);
-    u.macro_status_final = hrMacroStatus(novoStatus, cand.motivo_detalhes);
-    return u;
-  };
-
-  const HR_STATUS_COLORS = {
-    'Banco de Talentos':    { bg:'bg-gray-100',   text:'text-gray-700',   border:'border-gray-300',   dot:'bg-gray-400'   },
-    'Em análise':           { bg:'bg-yellow-100', text:'text-yellow-800', border:'border-yellow-300', dot:'bg-yellow-500' },
-    'Entrevista agendada':  { bg:'bg-blue-100',   text:'text-blue-800',   border:'border-blue-300',   dot:'bg-blue-500'   },
-    'Entrevista realizada': { bg:'bg-purple-100', text:'text-purple-800', border:'border-purple-300', dot:'bg-purple-500' },
-    'Fase de Teste':        { bg:'bg-indigo-100', text:'text-indigo-800', border:'border-indigo-300', dot:'bg-indigo-500' },
-    'Contratado':           { bg:'bg-green-100',  text:'text-green-800',  border:'border-green-300',  dot:'bg-green-500'  },
-    'Recusado':             { bg:'bg-red-100',    text:'text-red-800',    border:'border-red-300',    dot:'bg-red-500'    },
-    'Aguardando retorno':   { bg:'bg-orange-100', text:'text-orange-800', border:'border-orange-300', dot:'bg-orange-500' },
-    'Desistiu':             { bg:'bg-gray-100',   text:'text-gray-500',   border:'border-gray-200',   dot:'bg-gray-400'   },
-  };
-
-  // ── Estado local para novo candidato / edição ─────────────
-  const [hrShowForm, setHrShowForm] = useState(false);
-  const [hrEditId, setHrEditId] = useState(null);
-  const [hrQuickFilter, setHrQuickFilter] = useState('all'); // 'all'|'atrasos'|'entrevistas'|'contratados'
-  const [hrForm, setHrForm] = useState({
-    candidato:'', telefone:'', fonte_captacao:'', recebimento_curriculo: new Date().toISOString().split('T')[0],
-    data_resposta:'', entrevista_agendada:'', data_teste:'', status_processo:'Banco de Talentos',
-    motivo_detalhes:'—', nota_interna:'', observacoes:'', responsavel:'',
-    retornou:false, interessado:false, recusa:false, desvio:false,
-  });
-
-  const hrResetForm = () => {
-    setHrForm({ candidato:'', telefone:'', fonte_captacao:'', recebimento_curriculo: new Date().toISOString().split('T')[0], data_resposta:'', entrevista_agendada:'', data_teste:'', status_processo:'Banco de Talentos', motivo_detalhes:'—', nota_interna:'', observacoes:'', responsavel:'', retornou:false, interessado:false, recusa:false, desvio:false });
-    setHrEditId(null);
-    setHrShowForm(false);
-  };
-
-  const hrHandleStatusChange = (novoStatus) => {
-    const gatilhos = hrGatilhosStatus(novoStatus, hrForm);
-    setHrForm(prev => ({ ...prev, ...gatilhos }));
-  };
-
-  const hrSaveCandidate = async () => {
-    if (!hrForm.candidato.trim()) { alert('Nome do candidato é obrigatório.'); return; }
-    const gargalo = hrGargalo(hrForm);
-    const payload = {
-      ...hrForm,
-      store_code: selectedStore,
-      whatsapp: hrForm.telefone ? hrForm.telefone.replace(/\D/g,'') : null,
-      etapa_maxima: hrEtapaMaxima(hrForm.status_processo),
-      macro_status_final: hrMacroStatus(hrForm.status_processo, hrForm.motivo_detalhes),
-      gargalo: gargalo,
-      nota_interna: hrForm.nota_interna ? parseInt(hrForm.nota_interna) : null,
-      updated_at: new Date().toISOString(),
-    };
-    if (hrEditId) {
-      await supabase.from('hr_candidates').update(payload).eq('id', hrEditId);
-    } else {
-      await supabase.from('hr_candidates').insert([payload]);
-    }
-    await loadHrCandidates();
-    hrResetForm();
-  };
-
-  const hrDeleteCandidate = async (id) => {
-    if (!confirm('Excluir este candidato?')) return;
-    await supabase.from('hr_candidates').delete().eq('id', id);
-    setHrCandidates(prev => prev.filter(c => c.id !== id));
-  };
-
-  const hrStartEdit = (cand) => {
-    setHrForm({
-      candidato: cand.candidato || '', telefone: cand.telefone || '',
-      fonte_captacao: cand.fonte_captacao || '', recebimento_curriculo: cand.recebimento_curriculo || '',
-      data_resposta: cand.data_resposta || '', entrevista_agendada: cand.entrevista_agendada || '',
-      data_teste: cand.data_teste || '', status_processo: cand.status_processo || 'Banco de Talentos',
-      motivo_detalhes: cand.motivo_detalhes || '—', nota_interna: cand.nota_interna || '',
-      observacoes: cand.observacoes || '', responsavel: cand.responsavel || '',
-      retornou: cand.retornou||false, interessado: cand.interessado||false,
-      recusa: cand.recusa||false, desvio: cand.desvio||false,
-    });
-    setHrEditId(cand.id);
-    setHrShowForm(true);
-  };
-
-  const renderHrTab = () => {
-    // Filtros rápidos
-    let filtered = hrCandidates.filter(c => {
-      if (hrFilter !== 'all' && c.status_processo !== hrFilter) return false;
-      if (hrSearch && !c.candidato?.toLowerCase().includes(hrSearch.toLowerCase()) && !c.telefone?.includes(hrSearch)) return false;
-      if (hrQuickFilter === 'atrasos') return hrAlertaSLA(c) || (hrGargalo(c) && hrGargalo(c) !== null);
-      if (hrQuickFilter === 'entrevistas') return c.status_processo === 'Entrevista agendada' || c.status_processo === 'Entrevista realizada';
-      if (hrQuickFilter === 'contratados') return c.status_processo === 'Contratado';
-      if (hrQuickFilter === 'semretorno') return !c.data_resposta && c.recebimento_curriculo;
-      return true;
-    });
-
-    const stats = {
-      total: hrCandidates.length,
-      atrasos: hrCandidates.filter(c => hrAlertaSLA(c)).length,
-      entrevistas: hrCandidates.filter(c => c.status_processo === 'Entrevista agendada').length,
-      contratados: hrCandidates.filter(c => c.status_processo === 'Contratado').length,
-      semRetorno: hrCandidates.filter(c => !c.data_resposta && c.recebimento_curriculo).length,
-    };
-
-    return (
-      <div className="space-y-4">
-
-        {/* HEADER */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-rose-100 p-2 rounded-xl"><Briefcase className="w-5 h-5 text-rose-600"/></div>
-              <div><h2 className="font-bold text-gray-800 text-lg">Recrutamento &amp; Seleção</h2><p className="text-xs text-gray-500">Gestão de candidatos</p></div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setShowHrImportModal(true)} className="flex items-center gap-2 border border-rose-300 text-rose-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-rose-50 transition-colors"><Upload className="w-4 h-4"/> Importar</button>
-              <button onClick={() => { hrResetForm(); setHrShowForm(true); }} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"><PlusCircle className="w-4 h-4"/> Novo Candidato</button>
-            </div>
-          </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
-            {[
-              { label:'Total', value:stats.total, color:'text-gray-700', bg:'bg-gray-50', filter:'all' },
-              { label:'⚠️ Atrasos', value:stats.atrasos, color:'text-orange-700', bg:'bg-orange-50', filter:'atrasos' },
-              { label:'📅 Entrevistas', value:stats.entrevistas, color:'text-blue-700', bg:'bg-blue-50', filter:'entrevistas' },
-              { label:'✅ Contratados', value:stats.contratados, color:'text-green-700', bg:'bg-green-50', filter:'contratados' },
-              { label:'🔇 Sem retorno', value:stats.semRetorno, color:'text-red-700', bg:'bg-red-50', filter:'semretorno' },
-            ].map(s => (
-              <button key={s.label} onClick={() => setHrQuickFilter(hrQuickFilter === s.filter ? 'all' : s.filter)}
-                className={'rounded-xl p-2.5 text-center transition-all border-2 ' + s.bg + ' ' + (hrQuickFilter === s.filter ? 'border-rose-400 shadow-md' : 'border-transparent')}>
-                <div className={'text-2xl font-bold ' + s.color}>{s.value}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* FILTROS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-48">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/>
-              <input value={hrSearch} onChange={e => setHrSearch(e.target.value)} placeholder="Buscar candidato..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {['all',...HR_STATUS_OPTIONS].map(s => (
-                <button key={s} onClick={() => setHrFilter(s)}
-                  className={'text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ' + (hrFilter === s ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300')}>
-                  {s === 'all' ? 'Todos' : s}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* FORMULÁRIO NOVO / EDITAR */}
-        {hrShowForm && (
-          <div className="bg-white rounded-2xl border-2 border-rose-200 shadow-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-rose-800 text-lg flex items-center gap-2">
-                <UserCheck className="w-5 h-5"/> {hrEditId ? 'Editar Candidato' : 'Novo Candidato'}
-              </h3>
-              <button onClick={hrResetForm} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Nome */}
-              <div className="lg:col-span-2">
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nome do Candidato *</label>
-                <input value={hrForm.candidato} onChange={e => setHrForm(p=>({...p,candidato:e.target.value}))} placeholder="Nome completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              {/* Telefone */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Telefone</label>
-                <input value={hrForm.telefone} onChange={e => setHrForm(p=>({...p,telefone:e.target.value}))} placeholder="(11) 99999-9999" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              {/* Status — DROPDOWN */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Status do Processo</label>
-                <select value={hrForm.status_processo} onChange={e => hrHandleStatusChange(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
-                  {HR_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              {/* Motivo — DROPDOWN */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Motivo / Detalhes</label>
-                <select value={hrForm.motivo_detalhes} onChange={e => setHrForm(p=>({...p,motivo_detalhes:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
-                  {HR_MOTIVO_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              {/* Fonte */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Fonte de Captação</label>
-                <select value={hrForm.fonte_captacao} onChange={e => setHrForm(p=>({...p,fonte_captacao:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
-                  <option value="">—</option>
-                  {HR_FONTE_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </div>
-              {/* Datas */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Recebimento Currículo <span className="text-rose-500 text-xs">(auto)</span></label>
-                <input type="date" value={hrForm.recebimento_curriculo} onChange={e => setHrForm(p=>({...p,recebimento_curriculo:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Data de Resposta</label>
-                <input type="date" value={hrForm.data_resposta} onChange={e => setHrForm(p=>({...p,data_resposta:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Entrevista Agendada</label>
-                <input type="date" value={hrForm.entrevista_agendada} onChange={e => setHrForm(p=>({...p,entrevista_agendada:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Data do Teste</label>
-                <input type="date" value={hrForm.data_teste} onChange={e => setHrForm(p=>({...p,data_teste:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              {/* Nota */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nota Interna (1-5)</label>
-                <select value={hrForm.nota_interna} onChange={e => setHrForm(p=>({...p,nota_interna:e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none bg-white">
-                  <option value="">—</option>
-                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{'⭐'.repeat(n)} {n}</option>)}
-                </select>
-              </div>
-              {/* Responsável */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Responsável</label>
-                <input value={hrForm.responsavel} onChange={e => setHrForm(p=>({...p,responsavel:e.target.value}))} placeholder="Nome da gerente" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"/>
-              </div>
-              {/* Observações */}
-              <div className="md:col-span-2 lg:col-span-3">
-                <label className="block text-xs font-bold text-gray-600 mb-1">Observações</label>
-                <textarea value={hrForm.observacoes} onChange={e => setHrForm(p=>({...p,observacoes:e.target.value}))} rows={2} placeholder="Anotações sobre o candidato..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
-              </div>
-              {/* Flags */}
-              <div className="flex flex-wrap gap-4 items-center">
-                {[['interessado','✓ Interessado'],['retornou','↩ Retornou'],['recusa','✗ Recusa'],['desvio','⚠ Desvio']].map(([k,l]) => (
-                  <label key={k} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={hrForm[k]} onChange={e => setHrForm(p=>({...p,[k]:e.target.checked}))} className="w-4 h-4 rounded accent-rose-500"/>
-                    <span className="text-gray-700">{l}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-5 pt-4 border-t border-gray-100">
-              <button onClick={hrResetForm} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button>
-              <button onClick={hrSaveCandidate} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors shadow-md">
-                {hrEditId ? 'Salvar Alterações' : 'Adicionar Candidato'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* KANBAN / CARDS */}
-        <div className="space-y-2">
-          {filtered.length === 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-              <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3"/>
-              <p className="text-gray-500 font-medium">Nenhum candidato encontrado</p>
-              <p className="text-gray-400 text-sm mt-1">Crie um novo candidato ou ajuste os filtros</p>
-            </div>
-          )}
-
-          {filtered.map(cand => {
-            const isOpen = hrExpanded.has(cand.id);
-            const sc = HR_STATUS_COLORS[cand.status_processo] || HR_STATUS_COLORS['Banco de Talentos'];
-            const toggleExpand = () => { const ns = new Set(hrExpanded); ns.has(cand.id) ? ns.delete(cand.id) : ns.add(cand.id); setHrExpanded(ns); };
-            const gargalo = hrGargalo(cand);
-            const sla = hrAlertaSLA(cand);
-            const diasResp = hrDiasAteResposta(cand);
-            const waLink = hrLinkWA(cand.telefone || cand.whatsapp);
-            const macro = hrMacroStatus(cand.status_processo, cand.motivo_detalhes);
-
-            return (
-              <div key={cand.id} className={'rounded-2xl border shadow-sm overflow-hidden transition-all ' + (sla ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200 bg-white')}>
-
-                {/* SLA alert banner */}
-                {sla && (
-                  <div className="bg-orange-100 border-b border-orange-200 px-4 py-1.5 flex items-center gap-2 text-xs text-orange-700 font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0"/> ⚠️ Atraso no retorno — currículo recebido sem resposta há mais de 24h
-                  </div>
-                )}
-
-                {/* Card header */}
-                <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 transition-colors" onClick={toggleExpand}>
-                  {/* Status dot */}
-                  <div className={'w-2.5 h-2.5 rounded-full shrink-0 ' + sc.dot}></div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-800 text-sm">{cand.candidato}</span>
-                      <span className={'text-xs px-2 py-0.5 rounded-full border font-medium ' + sc.bg + ' ' + sc.text + ' ' + sc.border}>
-                        {cand.status_processo || '—'}
-                      </span>
-                      {macro !== '—' && (
-                        <span className="text-xs text-gray-500">{macro}</span>
-                      )}
-                      {cand.nota_interna && (
-                        <span className="text-xs text-yellow-600">{'⭐'.repeat(cand.nota_interna)}</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
-                      {cand.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3"/>{cand.telefone}</span>}
-                      {cand.fonte_captacao && <span className="flex items-center gap-1"><Share2 className="w-3 h-3"/>{cand.fonte_captacao}</span>}
-                      {cand.recebimento_curriculo && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>{formatDateBR(cand.recebimento_curriculo)}</span>}
-                      {diasResp !== null && <span className={'flex items-center gap-1 font-medium ' + (diasResp > 1 ? 'text-red-600' : 'text-green-600')}><Clock className="w-3 h-3"/>{diasResp}d resposta</span>}
-                      {cand.entrevista_agendada && <span className="flex items-center gap-1 text-blue-600"><Clock className="w-3 h-3"/>Entrev: {formatDateBR(cand.entrevista_agendada)}</span>}
-                      {gargalo && <span className="flex items-center gap-1 text-orange-600 font-medium"><AlertCircle className="w-3 h-3"/>{gargalo}</span>}
-                    </div>
-                  </div>
-
-                  {/* Ações rápidas */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {waLink && (
-                      <a href={waLink} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition-colors">
-                        <MessageCircle className="w-3.5 h-3.5"/> WA
-                      </a>
-                    )}
-                    <button onClick={e => { e.stopPropagation(); hrStartEdit(cand); }}
-                      className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors">
-                      <FileText className="w-4 h-4"/>
-                    </button>
-                    <button onClick={e => { e.stopPropagation(); hrDeleteCandidate(cand.id); }}
-                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                      <Trash2 className="w-4 h-4"/>
-                    </button>
-                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
-                  </div>
-                </div>
-
-                {/* Detalhes expandidos */}
-                {isOpen && (
-                  <div className="border-t border-gray-100 p-4 bg-gray-50/50 space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        { label:'Etapa Máxima',   value: cand.etapa_maxima || hrEtapaMaxima(cand.status_processo) },
-                        { label:'Macro Status',   value: macro },
-                        { label:'Gargalo',        value: gargalo || '✅ Fluxo ok' },
-                        { label:'Responsável',    value: cand.responsavel },
-                        { label:'Data Resposta',  value: formatDateBR(cand.data_resposta) },
-                        { label:'Entrevista',     value: formatDateBR(cand.entrevista_agendada) },
-                        { label:'Teste',          value: formatDateBR(cand.data_teste) },
-                        { label:'Motivo',         value: cand.motivo_detalhes !== '—' ? cand.motivo_detalhes : null },
-                      ].filter(f => f.value && f.value !== '—').map(f => (
-                        <div key={f.label} className="bg-white rounded-lg p-2.5 border border-gray-100">
-                          <div className="text-xs text-gray-400 mb-0.5">{f.label}</div>
-                          <div className="text-sm font-medium text-gray-700">{f.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {cand.interessado && <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full border border-green-200">✓ Interessado</span>}
-                      {cand.retornou    && <span className="text-xs bg-blue-100  text-blue-700  px-3 py-1 rounded-full border border-blue-200">↩ Retornou</span>}
-                      {cand.recusa      && <span className="text-xs bg-red-100   text-red-700   px-3 py-1 rounded-full border border-red-200">✗ Recusa</span>}
-                      {cand.desvio      && <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full border border-orange-200">⚠ Desvio</span>}
-                    </div>
-                    {cand.observacoes && (
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <div className="text-xs text-gray-400 mb-1">📝 Observações</div>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{cand.observacoes}</p>
-                      </div>
-                    )}
-                    {/* Editar inline */}
-                    <div className="flex justify-end">
-                      <button onClick={() => hrStartEdit(cand)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-all">
-                        <FileText className="w-4 h-4"/> Editar candidato
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {showHrImportModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-              <div className="p-5 border-b flex items-center justify-between"><h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600"/> Importar Candidatos</h3><button onClick={() => setShowHrImportModal(false)}><X className="w-5 h-5 text-gray-400 hover:text-gray-600"/></button></div>
-              <div className="p-5 space-y-4">
-                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200"><strong>Formato:</strong> Cole direto do Excel. Colunas na ordem do seu sistema de RH.</div>
-                <textarea value={hrImportText} onChange={e => setHrImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..." rows={10} className="w-full border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-rose-300 focus:outline-none resize-none"/>
-              </div>
-              <div className="p-5 border-t flex justify-end gap-3"><button onClick={() => setShowHrImportModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancelar</button><button onClick={processHrImport} className="px-6 py-2 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors">Processar</button></div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ── SPRINT 1: AUTH SCREENS ────────────────────────────────
-  if (session === undefined) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
-        <div className="text-white text-lg font-bold">Verificando sessão...</div>
-      </div>
-    </div>
-  );
-
-  if (!session) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"/>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl"/>
-      </div>
-      <div className="relative w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-2xl mb-4"><Package className="w-8 h-8 text-white"/></div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Nova OS</h1>
-          <p className="text-indigo-300 text-sm mt-1">Sistema de Gestão de Lojas</p>
-        </div>
-        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8">
-          {!showForgot ? (
-            <>
-              <h2 className="text-xl font-bold text-white mb-6">Entrar na sua conta</h2>
-              <button onClick={handleGoogleLogin} disabled={loginLoading} className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all mb-6 disabled:opacity-60">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Entrar com o Google
-              </button>
-              <div className="flex items-center gap-3 mb-6"><div className="flex-1 h-px bg-white/20"/><span className="text-white/50 text-xs font-medium">ou continue com e-mail</span><div className="flex-1 h-px bg-white/20"/></div>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div><label className="block text-sm font-medium text-indigo-200 mb-1.5">E-mail</label><input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="seu@email.com" className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"/></div>
-                <div><label className="block text-sm font-medium text-indigo-200 mb-1.5">Senha</label><input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"/></div>
-                {loginError && (<div className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 text-red-300 text-sm rounded-xl px-4 py-3"><AlertCircle className="w-4 h-4 shrink-0"/>{loginError}</div>)}
-                <button type="submit" disabled={loginLoading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-60">
-                  {loginLoading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Entrando...</span> : 'Entrar'}
-                </button>
-              </form>
-              <div className="text-center mt-5"><button onClick={() => { setShowForgot(true); setForgotEmail(loginEmail); setLoginError(''); }} className="text-indigo-300 hover:text-white text-sm transition-colors underline underline-offset-2">Esqueci minha senha</button></div>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { setShowForgot(false); setForgotSent(false); setLoginError(''); }} className="flex items-center gap-1.5 text-indigo-300 hover:text-white text-sm mb-6 transition-colors"><ChevronLeft className="w-4 h-4"/> Voltar ao login</button>
-              {!forgotSent ? (
-                <>
-                  <h2 className="text-xl font-bold text-white mb-2">Recuperar senha</h2>
-                  <p className="text-indigo-300 text-sm mb-6">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    <div><label className="block text-sm font-medium text-indigo-200 mb-1.5">E-mail</label><input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required placeholder="seu@email.com" className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all"/></div>
-                    {loginError && (<div className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 text-red-300 text-sm rounded-xl px-4 py-3"><AlertCircle className="w-4 h-4 shrink-0"/> {loginError}</div>)}
-                    <button type="submit" disabled={loginLoading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-xl shadow-lg transition-all disabled:opacity-60">{loginLoading ? 'Enviando...' : 'Enviar link de recuperação'}</button>
-                  </form>
-                </>
-              ) : (
-                <div className="text-center py-6">
-                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle className="w-8 h-8 text-green-400"/></div>
-                  <h2 className="text-xl font-bold text-white mb-2">E-mail enviado!</h2>
-                  <p className="text-indigo-300 text-sm">Verifique sua caixa de entrada em <span className="text-white font-medium">{forgotEmail}</span>.</p>
-                  <button onClick={() => { setShowForgot(false); setForgotSent(false); }} className="mt-6 text-indigo-300 hover:text-white text-sm underline underline-offset-2 transition-colors">Voltar ao login</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        <p className="text-center text-white/30 text-xs mt-6">© {new Date().getFullYear()} Nova ParetoOS</p>
-      </div>
-    </div>
-  );
-
-  if (dbLoading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 to-slate-900">
-      <div className="text-center"><div className="w-12 h-12 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"/><div className="text-white text-xl font-bold mb-2">Carregando dados...</div><div className="text-indigo-300 text-sm">Conectando ao banco de dados</div></div>
-    </div>
-  );
-
-  // ── MAIN APP RETURN ───────────────────────────────────────
   return (
     <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-slate-800 font-sans pb-20 ${printMode ? 'bg-white' : ''}`}>
-      <style>{`@media print { @page { margin: 1.5cm; size: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; } .no-print { display: none !important; } }`}</style>
-
-      {selectedCategory && <CategoryDetailPanel category={selectedCategory} items={dashboardStats.categoryItems[selectedCategory] || []} onClose={() => setSelectedCategory(null)} />}
-
-      {/* Hidden photo input for Sprint 3 */}
-      <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e => { if(photoUploadKey && e.target.files[0]) handlePhotoUpload(photoUploadKey, e.target.files[0]); setPhotoUploadKey(null); e.target.value=''; }}/>
+      <style>{`@media print { @page { margin: 1.5cm; size: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; } .no-print { display: none !important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
+      
+      {/* PAINEL DETALHES DA CATEGORIA */}
+      {selectedCategory && (
+        <CategoryDetailPanel
+          category={selectedCategory}
+          items={dashboardStats.categoryItems[selectedCategory] || []}
+          onClose={() => setSelectedCategory(null)}
+        />
+      )}
 
       {!printMode && (
         <>
-          {showHistoryImportModal && (
+            {showHistoryImportModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
-                <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-indigo-800"><Upload className="w-5 h-5"/> Importar Histórico de Vendas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-200">
-                  <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Loja</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm" value={importTargetStore} onChange={e=>setImportTargetStore(e.target.value)}>{Object.entries(STORE_CONFIGS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}</select></div>
-                  <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Mês</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm" value={selectedMonth} onChange={e=>setSelectedMonth(parseInt(e.target.value))}>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{getMonthName(i+1)}</option>)}</select></div>
-                  <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Ano</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm" value={selectedYear} onChange={e=>setSelectedYear(parseInt(e.target.value))}>{Array.from({length:10},(_,i)=><option key={i} value={2020+i}>{2020+i}</option>)}</select></div>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
+                    <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-indigo-800"><Upload className="w-5 h-5"/> Importar Histórico de Vendas</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-200">
+                        <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Loja de Destino</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={importTargetStore} onChange={e => setImportTargetStore(e.target.value)}>{Object.entries(STORE_CONFIGS).map(([key, config]) => (<option key={key} value={key}>{config.name}</option>))}</select></div>
+                        <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Mês</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))}>{Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{getMonthName(i+1)}</option>)}</select></div>
+                        <div><label className="block text-xs font-bold text-indigo-900 mb-1.5">Ano</label><select className="w-full border border-indigo-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))}>{Array.from({length: 10}, (_, i) => <option key={i} value={2020+i}>{2020+i}</option>)}</select></div>
+                    </div>
+                    <div className="mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={clearBeforeImport} onChange={(e) => setClearBeforeImport(e.target.checked)} className="w-4 h-4 text-yellow-600 rounded"/><span className="font-medium text-yellow-800">Limpar dados existentes deste período antes de importar</span></label>
+                      <p className="text-xs text-yellow-700 mt-1 ml-6">Use esta opção para sobrescrever dados antigos e evitar duplicação</p>
+                    </div>
+                    <textarea className="w-full h-48 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-indigo-400 focus:outline-none" value={historyImportText} onChange={e => setHistoryImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..."/>
+                    <div className="flex justify-end gap-2 mt-4">
+                      <button onClick={() => { setShowHistoryImportModal(false); setClearBeforeImport(false); }} className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100">Cancelar</button>
+                      <button onClick={processSalesHistoryImport} className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 shadow-md">Processar</button>
+                    </div>
                 </div>
-                <div className="mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200"><label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={clearBeforeImport} onChange={e=>setClearBeforeImport(e.target.checked)} className="w-4 h-4 rounded"/><span className="font-medium text-yellow-800">Limpar dados existentes antes de importar</span></label></div>
-                <textarea className="w-full h-48 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-indigo-400" value={historyImportText} onChange={e=>setHistoryImportText(e.target.value)} placeholder="Cole aqui os dados copiados do Excel..."/>
-                <div className="flex justify-end gap-2 mt-4"><button onClick={()=>{setShowHistoryImportModal(false);setClearBeforeImport(false);}} className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100">Cancelar</button><button onClick={processSalesHistoryImport} className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 shadow-md">Processar</button></div>
-              </div>
             </div>
-          )}
-          {showImportModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
-                <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-blue-800"><Upload className="w-5 h-5"/> Importar Dados do Sistema</h3>
-                {/* SPRINT 2: clear instructions */}
-                <div className="mb-3 bg-blue-50 rounded-xl p-3 text-sm text-blue-700 border border-blue-200">
-                  <strong>Como usar:</strong> Copie os dados do seu sistema de gestão (Excel, CSV ou tabulado) e cole abaixo. O sistema irá identificar automaticamente as colunas. <span className="text-blue-600 font-semibold">As contagens físicas já feitas NÃO serão apagadas.</span>
+            )}
+            {showImportModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-blue-800"><Upload className="w-5 h-5"/> Importar Dados do Sistema</h3>
+                  <textarea className="w-full h-64 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none" value={importText} onChange={e => setImportText(e.target.value)} placeholder="MARCA..."/>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button onClick={() => setShowImportModal(false)} className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button onClick={processImport} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-md">Processar</button>
+                  </div>
                 </div>
-                <div className="mb-3 text-xs text-gray-500">Loja de destino: <select value={importTargetStore} onChange={e=>setImportTargetStore(e.target.value)} className="border border-gray-200 rounded px-2 py-1 ml-1">{Object.entries(STORE_CONFIGS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}</select></div>
-                <textarea className="w-full h-64 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-blue-400" value={importText} onChange={e=>setImportText(e.target.value)} placeholder="Cole aqui os dados do CSV / Excel (com cabeçalho na primeira linha)...&#10;&#10;Exemplo:&#10;REFERENCIA  MARCADESC  TIPODESC  P  M  G  GG  36  38  40  42  44..."/>
-                <div className="flex justify-end gap-2 mt-4"><button onClick={()=>setShowImportModal(false)} className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100">Cancelar</button><button onClick={processImport} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-md">Processar</button></div>
               </div>
-            </div>
-          )}
-          {showResetModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-yellow-200">
-                <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-b border-yellow-200 flex items-center gap-3"><AlertTriangle className="w-6 h-6 text-yellow-600"/><h3 className="font-bold text-lg text-yellow-800">Cuidado!</h3></div>
-                <div className="p-6"><p className="text-gray-700 mb-4">Você está prestes a preencher toda a contagem com os dados do sistema.</p><p className="text-sm text-gray-500 font-bold">Isso irá SOBRESCREVER qualquer contagem manual já feita.</p></div>
-                <div className="p-4 bg-gray-50 flex justify-end gap-2"><button onClick={()=>setShowResetModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm">Cancelar</button><button onClick={confirmFillAuditWithSystem} className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg text-sm font-bold shadow-md">Sim, Preencher Tudo</button></div>
+            )}
+            {showResetModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-yellow-200">
+                  <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-b border-yellow-200 flex items-center gap-3"><AlertTriangle className="w-6 h-6 text-yellow-600"/><h3 className="font-bold text-lg text-yellow-800">Cuidado!</h3></div>
+                  <div className="p-6"><p className="text-gray-700 mb-4">Você está prestes a preencher toda a contagem com os dados do sistema.</p><p className="text-sm text-gray-500 font-bold">Isso irá SOBRESCREVER qualquer contagem manual que você já tenha feito.</p></div>
+                  <div className="p-4 bg-gray-50 flex justify-end gap-2">
+                    <button onClick={() => setShowResetModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium">Cancelar</button>
+                    <button onClick={confirmFillAuditWithSystem} className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 text-white hover:from-yellow-700 hover:to-orange-700 rounded-lg text-sm font-bold shadow-md">Sim, Preencher Tudo</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </>
       )}
 
       {!printMode && (
         <nav className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm no-print overflow-x-auto">
           <div className="max-w-7xl mx-auto flex px-4">
-            <button onClick={()=>navigateTab('system')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='system'?'border-blue-500 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}><Package className="w-4 h-4 inline mr-1"/> 1. Sistema</button>
-            <button onClick={()=>navigateTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='audit'?'border-green-500 text-green-600':'border-transparent text-gray-500 hover:text-gray-700'}`}><CheckCircle className="w-4 h-4 inline mr-1"/> 2. Auditoria</button>
-            <button onClick={()=>navigateTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='dashboard'?'border-purple-500 text-purple-600':'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 3. Dashboard</button>
-            <button onClick={()=>navigateTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='marketing'?'border-pink-500 text-pink-600':'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 4. Divulgação</button>
-            <button onClick={()=>navigateTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='viability'?'border-emerald-600 text-emerald-700':'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 5. DRE</button>
-            <button onClick={()=>navigateTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='goals'?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 6. Metas</button>
-            <button onClick={()=>navigateTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab==='hr'?'border-rose-500 text-rose-600':'border-transparent text-gray-500 hover:text-gray-700'}`}><Briefcase className="w-4 h-4 inline mr-1"/> 7. RH</button>
-            <div className="ml-auto flex items-center px-4 gap-2">{userRole && <span className="text-xs text-gray-400 hidden md:block capitalize">{userRole}</span>}<button onClick={()=>supabase.auth.signOut()} className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all">Sair</button></div>
+            <button onClick={() => setActiveTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${['audit','system','diff'].includes(activeTab) ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><CheckCircle className="w-4 h-4 inline mr-1"/> 1. Auditoria</button>
+            <button onClick={() => setActiveTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1"/> 2. Dashboard</button>
+            <button onClick={() => setActiveTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 3. Divulgação</button>
+            <button onClick={() => setActiveTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 4. DRE</button>
+            <button onClick={() => setActiveTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 5. Metas</button>
           </div>
         </nav>
       )}
 
-      <main className={`max-w-7xl mx-auto p-4 md:p-6 ${printMode?'pt-20':''}`}>
+      <main className={`max-w-7xl mx-auto p-4 md:p-6 ${printMode ? 'pt-20' : ''}`}>
+        
+        {/* ═══════════════════════════════════════════════════
+            ABA UNIFICADA: AUDITORIA DE ESTOQUE
+            • Seção 1: ERP (volátil) — importação sobrescreve
+            • Seção 2: Contagem Física (persistente) — manual
+            • Seção 3: Divergências (isoladas por tamanho)
+        ═══════════════════════════════════════════════════ */}
+        {['audit','system','diff'].includes(activeTab) && (() => {
+          const storeOptions = userRole === 'owner' ? ['3','4','7','8','10'] : userStoreAccess;
 
-        {/* ABA 1: SISTEMA */}
-        {activeTab === 'system' && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex flex-wrap justify-between items-center gap-3">
-              <h2 className="font-bold text-gray-700 flex items-center gap-2"><Package className="w-5 h-5"/> Estoque no Sistema</h2>
-              <div className="flex items-center gap-3">
-                <select value={selectedStore} onChange={async e=>{setSelectedStore(e.target.value);setTimeout(loadStoreData,50);}} className="text-sm font-bold border border-blue-200 rounded-lg px-3 py-1.5 bg-white text-blue-700 focus:ring-2 focus:ring-blue-300">
-                  {(userRole==='owner'?['3','4','7','8','10']:userStoreAccess).map(s=><option key={s} value={s}>Loja {s}</option>)}
-                </select>
-                <button onClick={()=>setShowImportModal(true)} className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center shadow-md"><Upload className="w-4 h-4 mr-2"/> Importar</button>
-              </div>
-            </div>
-            {/* SPRINT 2: search in system tab */}
-            <div className="p-4 bg-gray-50 border-b">
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/><input type="text" placeholder="Filtrar por referência, marca, tipo ou cor..." className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-700 uppercase bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                  <tr><th className="px-4 py-3">Ref / Marca</th>{sizeColumns.map(s=><th key={s} className="px-2 py-3 text-center">{s}</th>)}<th className="px-4 py-3 text-right">Total</th></tr>
-                </thead>
-                <tbody>
-                  {filteredSystemData.map(item=><tr key={item.id} className="border-b hover:bg-blue-50/30"><td className="px-4 py-3"><div>{item.REFERENCIA}</div><div className="text-xs text-gray-500">{item.MARCADESC}</div></td>{sizeColumns.map(s=><td key={s} className="text-center px-2">{item.sizes[s]}</td>)}<td className="text-right px-4 font-bold">{item.QTDE}</td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          // ── Zerar Estoque: copia lista do ERP com qty=0 ──────
+          const handleZerarEstoque = async () => {
+            if (!window.confirm('Isso vai zerar TODAS as contagens físicas e trazer a lista do ERP sem quantidades.\n\nIdeal para iniciar uma contagem cega. Confirmar?')) return;
+            const zeroed = systemData.map(item => {
+              const z = {}; sizeColumns.forEach(s => z[s] = 0);
+              return { ...item, sizes: z, QTDE: 0 };
+            });
+            setAuditData(zeroed);
+            await supabase.from('audit_data').delete().eq('store_code', selectedStore);
+            if (zeroed.length > 0) {
+              await supabase.from('audit_data').insert(zeroed.map(i => itemToDb(i, selectedStore)));
+            }
+          };
 
-        {/* ABA 2: AUDITORIA */}
-        {activeTab === 'audit' && (
-          <div className="space-y-0">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="p-4 border-b flex flex-wrap justify-between items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-bold text-green-800 flex items-center gap-2"><CheckCircle className="w-5 h-5"/> Auditoria de Estoque</h2>
-                  <select value={selectedStore} onChange={async e=>{setSelectedStore(e.target.value);setTimeout(loadStoreData,50);}} className="text-sm font-bold border border-green-200 rounded-lg px-3 py-1.5 bg-white text-green-700 focus:ring-2 focus:ring-green-300">
-                    {(userRole==='owner'?['3','4','7','8','10']:userStoreAccess).map(s=><option key={s} value={s}>Loja {s}</option>)}
-                  </select>
-                </div>
-                <button onClick={()=>setShowResetModal(true)} className="text-xs text-green-700 underline hover:text-green-900 flex items-center gap-1"><Copy className="w-3 h-3"/> Preencher c/ Sistema</button>
-              </div>
-              <div className="p-4 bg-gray-50">
-                <input type="text" placeholder="Buscar por referência, marca, tipo ou cor..." className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-green-400 focus:outline-none" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-gray-700 uppercase bg-gradient-to-r from-gray-50 to-green-50 border-b-2 border-green-200">
-                    <tr><th className="px-4 py-3">Ref</th>{sizeColumns.map(s=><th key={s} className="px-2 py-3 text-center">{s}</th>)}<th className="px-4 py-3 text-right">Total</th></tr>
-                  </thead>
-                  <tbody>
-                    {filteredAuditData.map(item=><tr key={item.id} className="border-b hover:bg-green-50/30"><td className="px-4 py-3 font-medium">{item.REFERENCIA}</td>{sizeColumns.map(s=><td key={s} className="px-1 py-2 text-center"><input type="number" className="w-10 border border-gray-300 text-center rounded focus:ring-2 focus:ring-green-400 focus:outline-none" value={item.sizes[s]} onChange={e=>handleAuditChange(item.id,s,e.target.value)}/></td>)}<td className="px-4 py-3 text-right font-bold text-green-800">{item.QTDE}</td></tr>)}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          // ── Divergências isoladas por tamanho ────────────────
+          // Regra estrita: cada tamanho avaliado individualmente.
+          // Sistema > Auditoria → Baixa nesse tamanho.
+          // Auditoria > Sistema → Entrada nesse tamanho.
+          // Sem compensação entre tamanhos diferentes.
+          const divergences = systemData.map(sys => {
+            const audit = auditData.find(a => a.id === sys.id);
+            if (!audit) return null;
+            const baixasSizes = {};
+            const entradasSizes = {};
+            let hasBaixa = false, hasEntrada = false;
+            sizeColumns.forEach(s => {
+              const sysQ = parseInt(sys.sizes[s]) || 0;
+              const audQ = parseInt(audit.sizes[s]) || 0;
+              if (sysQ > audQ) { baixasSizes[s] = audQ - sysQ; hasBaixa = true; }
+              if (audQ > sysQ) { entradasSizes[s] = audQ - sysQ; hasEntrada = true; }
+            });
+            if (!hasBaixa && !hasEntrada) return null;
+            return { ...sys, baixasSizes, entradasSizes, hasBaixa, hasEntrada };
+          }).filter(Boolean);
 
-            {/* SPRINT 2: Divergências separadas em Baixas e Entradas */}
-            <div className="mt-10 pt-8 border-t-4 border-dashed border-red-200">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-red-100 p-2 rounded-xl"><AlertTriangle className="w-5 h-5 text-red-500"/></div>
-                <div><h2 className="font-bold text-red-700 text-lg">Relatório de Divergências</h2><p className="text-xs text-gray-500">Diferenças entre estoque no sistema e contagem física</p></div>
-              </div>
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white p-6 rounded-2xl border shadow-lg">
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-xl text-red-800 border border-red-200 font-bold shadow-sm"><div className="text-3xl">{exits.length}</div><div className="text-sm opacity-80">Baixas (Saídas)</div><div className="text-xs opacity-60 mt-1">Contagem menor que o sistema</div></div>
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl text-green-800 border border-green-200 font-bold shadow-sm"><div className="text-3xl">{entries.length}</div><div className="text-sm opacity-80">Entradas (Sobras)</div><div className="text-xs opacity-60 mt-1">Contagem maior que o sistema</div></div>
+          const exitItems  = divergences.filter(d => d.hasBaixa   && !completedIds.has(d.id));
+          const entryItems = divergences.filter(d => d.hasEntrada && !completedIds.has(d.id));
+
+          return (
+            <div className="space-y-5">
+
+              {/* ── HEADER / SELETOR DE LOJA ── */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-900 rounded-2xl p-4 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/10 p-2.5 rounded-xl"><Package className="w-5 h-5 text-white"/></div>
+                    <div>
+                      <div className="text-white font-bold text-lg">Auditoria de Estoque</div>
+                      <div className="text-indigo-300 text-xs">Gestão unificada · ERP + Contagem física + Divergências</div>
+                    </div>
                   </div>
-                  {differences.length === 0 ? (
-                    <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4"/><p className="text-gray-500 text-lg font-medium">Estoque Perfeito!</p></div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {storeOptions.map(s => (
+                      <button key={s} onClick={async () => { setSelectedStore(s); setTimeout(loadStoreData, 50); }}
+                        className={'px-4 py-2 rounded-xl text-sm font-bold transition-all ' +
+                          (selectedStore === s
+                            ? 'bg-white text-indigo-900 shadow-lg scale-105'
+                            : 'bg-white/10 text-white hover:bg-white/20 border border-white/20')}>
+                        {STORE_CONFIGS[s]?.name || 'Loja ' + s}
+                      </button>
+                    ))}
+                    <button onClick={() => setShowImportModal(true)}
+                      className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all">
+                      <Upload className="w-4 h-4"/> Importar ERP
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SEÇÃO 1: ESTOQUE NO SISTEMA (ERP / VOLÁTIL) ── */}
+              <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+                <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-blue-100 p-1.5 rounded-lg"><Package className="w-4 h-4 text-blue-600"/></div>
+                    <div>
+                      <h3 className="font-bold text-blue-800 text-sm">Estoque no Sistema (ERP)</h3>
+                      <p className="text-xs text-blue-400">Volátil — cada importação substitui os dados anteriores</p>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-bold">{systemData.length} itens</span>
+                </div>
+                <div className="p-3 bg-gray-50 border-b">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                    <input type="text" placeholder="Filtrar por referência, marca, tipo ou cor..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"/>
+                  </div>
+                </div>
+                <div className="overflow-x-auto" style={{maxHeight: 280, overflowY: 'auto'}}>
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-600 uppercase bg-gradient-to-r from-gray-50 to-blue-50 border-b sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2.5 font-bold">Ref / Marca</th>
+                        {sizeColumns.map(s => <th key={s} className="px-2 py-2.5 text-center font-bold">{s}</th>)}
+                        <th className="px-4 py-2.5 text-right font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSystemData.length === 0 && (
+                        <tr><td colSpan={sizeColumns.length + 2} className="text-center py-8 text-gray-400 text-xs">Nenhum dado importado. Clique em "Importar ERP" para começar.</td></tr>
+                      )}
+                      {filteredSystemData.map(item => (
+                        <tr key={item.id} className="border-b hover:bg-blue-50/30 text-xs">
+                          <td className="px-4 py-2">
+                            <div className="font-medium text-gray-800">{item.REFERENCIA}</div>
+                            <div className="text-gray-400">{item.MARCADESC}</div>
+                          </td>
+                          {sizeColumns.map(s => (
+                            <td key={s} className={'text-center px-2 ' + ((parseInt(item.sizes[s]) || 0) > 0 ? 'font-bold text-blue-700' : 'text-gray-300')}>
+                              {(parseInt(item.sizes[s]) || 0) > 0 ? item.sizes[s] : '—'}
+                            </td>
+                          ))}
+                          <td className="text-right px-4 font-bold text-blue-800">{item.QTDE}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── SEÇÃO 2: CONTAGEM FÍSICA (PERSISTENTE) ── */}
+              <div className="bg-white rounded-2xl shadow-sm border border-green-100 overflow-hidden">
+                <div className="p-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-green-100 p-1.5 rounded-lg"><CheckCircle className="w-4 h-4 text-green-600"/></div>
+                    <div>
+                      <h3 className="font-bold text-green-800 text-sm">Contagem Física (Auditoria)</h3>
+                      <p className="text-xs text-green-400">Persistente — não é afetada pela importação do ERP</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowResetModal(true)}
+                      className="flex items-center gap-1.5 text-xs border border-green-300 text-green-700 hover:bg-green-50 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                      <Copy className="w-3 h-3"/> Preencher c/ Sistema
+                    </button>
+                    <button onClick={handleZerarEstoque}
+                      className="flex items-center gap-1.5 text-xs border border-orange-300 text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                      <RefreshCw className="w-3 h-3"/> Zerar Estoque
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-50 border-b">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                    <input type="text" placeholder="Buscar por referência, marca, tipo ou cor..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 focus:outline-none"/>
+                  </div>
+                </div>
+                <div className="overflow-x-auto" style={{maxHeight: 420, overflowY: 'auto'}}>
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-600 uppercase bg-gradient-to-r from-gray-50 to-green-50 border-b sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2.5 font-bold">Ref / Marca</th>
+                        {sizeColumns.map(s => <th key={s} className="px-2 py-2.5 text-center font-bold">{s}</th>)}
+                        <th className="px-4 py-2.5 text-right font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAuditData.length === 0 && (
+                        <tr><td colSpan={sizeColumns.length + 2} className="text-center py-8 text-gray-400 text-xs">
+                          Sem dados. Use "Zerar Estoque" para contagem cega ou "Preencher c/ Sistema" para partir do ERP.
+                        </td></tr>
+                      )}
+                      {filteredAuditData.map(item => (
+                        <tr key={item.id} className="border-b hover:bg-green-50/30 text-xs">
+                          <td className="px-4 py-2">
+                            <div className="font-medium text-gray-800">{item.REFERENCIA}</div>
+                            <div className="text-gray-400">{item.MARCADESC}</div>
+                          </td>
+                          {sizeColumns.map(s => (
+                            <td key={s} className="px-1 py-1.5 text-center">
+                              <input type="number" min="0" placeholder="—"
+                                className={'w-10 border text-center rounded text-xs py-1 focus:ring-2 focus:ring-green-400 focus:outline-none ' +
+                                  ((parseInt(item.sizes[s]) || 0) > 0
+                                    ? 'border-green-300 bg-green-50 font-bold text-green-800'
+                                    : 'border-gray-200 text-gray-400')}
+                                value={item.sizes[s] || ''}
+                                onChange={e => handleAuditChange(item.id, s, e.target.value)}/>
+                            </td>
+                          ))}
+                          <td className="px-4 py-2 text-right font-bold text-green-800">{item.QTDE || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── SEÇÃO 3: RELATÓRIO DE DIVERGÊNCIAS (ISOLADAS) ── */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-4 border-b bg-gradient-to-r from-red-50 to-orange-50 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-red-100 p-1.5 rounded-lg"><AlertTriangle className="w-4 h-4 text-red-600"/></div>
+                    <div>
+                      <h3 className="font-bold text-red-800 text-sm">Relatório de Divergências</h3>
+                      <p className="text-xs text-red-400">Cada tamanho avaliado isoladamente — sem compensação cruzada</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="text-center bg-red-100 rounded-xl px-3 py-1.5">
+                      <div className="text-xl font-black text-red-700">{exitItems.length}</div>
+                      <div className="text-xs text-red-500 font-medium">Baixas</div>
+                    </div>
+                    <div className="text-center bg-green-100 rounded-xl px-3 py-1.5">
+                      <div className="text-xl font-black text-green-700">{entryItems.length}</div>
+                      <div className="text-xs text-green-500 font-medium">Entradas</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4">
+                  {exitItems.length === 0 && entryItems.length === 0 ? (
+                    <div className="text-center py-10">
+                      <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3"/>
+                      <p className="text-gray-500 font-medium">Sem divergências! Estoque conferido.</p>
+                      <p className="text-xs text-gray-400 mt-1">ERP e Contagem Física estão alinhados.</p>
+                    </div>
                   ) : (
-                    <div className="space-y-4">
-                      <GroupedDifferenceTable items={exits} title="Pendentes — Baixas (Saídas)" icon={ArrowDownCircle} colorClass="border-red-200" bgClass="bg-red-50 text-red-800" isExit={true}/>
-                      <GroupedDifferenceTable items={entries} title="Pendentes — Entradas (Sobras)" icon={ArrowUpCircle} colorClass="border-green-200" bgClass="bg-green-50 text-green-800" isExit={false}/>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        {/* ABA 3: DASHBOARD */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border shadow-lg">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-bold text-gray-800 text-xl flex items-center gap-2"><BarChart3 className="w-6 h-6 text-purple-600"/> Dashboard</h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={()=>{setPrintMode(true);setTimeout(()=>{window.print();setPrintMode(false);},300);}} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600 no-print"><Printer className="w-4 h-4"/> Imprimir</button>
-                  <button onClick={()=>setShowDashboardFilters(!showDashboardFilters)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${showDashboardFilters||dashboardSizeFilter||dashboardCategoryFilter?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}><Filter className="w-4 h-4"/> Filtros{(dashboardSizeFilter||dashboardCategoryFilter)&&<span className="bg-white/30 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">{[dashboardSizeFilter,dashboardCategoryFilter].filter(Boolean).length}</span>}</button>
-                </div>
-              </div>
-              {showDashboardFilters && (
-                <div className="mb-6 p-5 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200">
-                  <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-purple-800 flex items-center gap-2"><SlidersHorizontal className="w-4 h-4"/> Filtrar Estoque</h3>{(dashboardSizeFilter||dashboardCategoryFilter)&&<button onClick={()=>{setDashboardSizeFilter('');setDashboardCategoryFilter('');}} className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"><X className="w-3 h-3"/> Limpar</button>}</div>
-                  <div className="mb-4"><div className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-2">Categoria</div><div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto"><button onClick={()=>setDashboardCategoryFilter('')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${!dashboardCategoryFilter?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}>Todos</button>{dashboardStats.sortedCategories.map(([cat,data])=><button key={cat} onClick={()=>setDashboardCategoryFilter(dashboardCategoryFilter===cat?'':cat)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1 ${dashboardCategoryFilter===cat?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}>{cat}<span className={`text-xs px-1 rounded ${dashboardCategoryFilter===cat?'bg-white/30 text-white':'bg-gray-100 text-gray-500'}`}>{data.total}</span></button>)}</div></div>
-                  <div className="mb-4"><div className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-2">Tamanho</div><div className="flex flex-wrap gap-2"><button onClick={()=>setDashboardSizeFilter('')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${!dashboardSizeFilter?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}>Todos</button>{allAvailableSizes.map(size=><button key={size} onClick={()=>setDashboardSizeFilter(dashboardSizeFilter===size?'':size)} className={`px-3 py-2 rounded-lg text-xs font-bold border min-w-[44px] ${dashboardSizeFilter===size?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}>{size}</button>)}</div></div>
-                  {(dashboardSizeFilter||dashboardCategoryFilter)&&(
-                    <div className="mt-5 border-t border-purple-200 pt-4">
-                      <div className="flex items-center justify-between mb-3"><h4 className="font-bold text-purple-900 text-sm">{dashboardFilteredItems.length} modelo{dashboardFilteredItems.length!==1?'s':''}</h4><span className="text-xs text-purple-600 font-bold">{dashboardSizeFilter?dashboardFilteredItems.reduce((a,i)=>a+(parseInt(i.sizes[dashboardSizeFilter])||0),0):dashboardFilteredItems.reduce((a,i)=>a+calculateTotal(i.sizes),0)} peças</span></div>
-                      <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {dashboardFilteredItems.map(item => {
-                          const inStock = sizeColumns.filter(s => (parseInt(item.sizes[s]) || 0) > 0);
-                          const total = dashboardSizeFilter
-                            ? (parseInt(item.sizes[dashboardSizeFilter]) || 0)
-                            : calculateTotal(item.sizes);
-                          const totalClass = total === 1
-                            ? 'bg-orange-100 text-orange-700'
-                            : total >= 5
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-gray-100 text-gray-700';
-                          return (
-                            <div key={item.id} className="bg-white rounded-xl border border-purple-100 p-3 hover:shadow-md">
-                              <div className="flex justify-between gap-2 mb-2">
-                                <div>
-                                  <div className="font-bold text-gray-900 text-sm">{item.TIPODESC}</div>
-                                  <div className="text-xs text-purple-700 font-mono">{item.REFERENCIA}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {item.MARCADESC}{item.COR1DESC ? ' · ' + item.COR1DESC : ''}
-                                  </div>
+                      {/* BAIXAS (Sistema > Auditoria) */}
+                      <div className="border border-red-200 rounded-xl overflow-hidden">
+                        <div className="bg-red-50 px-4 py-2.5 flex items-center gap-2 border-b border-red-200">
+                          <ArrowDownCircle className="w-4 h-4 text-red-600"/>
+                          <span className="font-bold text-red-800 text-sm">Baixas — Sistema maior</span>
+                          <span className="ml-auto text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-bold">{exitItems.length}</span>
+                        </div>
+                        <div className="divide-y divide-red-50 max-h-96 overflow-y-auto">
+                          {exitItems.length === 0
+                            ? <div className="py-6 text-center text-xs text-gray-400">Nenhuma baixa</div>
+                            : exitItems.map(item => (
+                              <div key={item.id} className="px-4 py-2.5 hover:bg-red-50/50">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="font-semibold text-sm text-gray-800">{item.REFERENCIA}</span>
+                                  {item.COR1DESC && <span className="text-xs text-gray-400">{item.COR1DESC}</span>}
                                 </div>
-                                <span className={'shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold ' + totalClass}>
-                                  {total} peças
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {inStock.map(s => {
-                                  const sizeClass = s === dashboardSizeFilter
-                                    ? 'bg-purple-600 text-white border-purple-600'
-                                    : 'bg-white text-indigo-700 border-indigo-200';
-                                  return (
-                                    <span key={s} className={'inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border ' + sizeClass}>
-                                      {s}
-                                      <span className="text-indigo-400 font-normal">×{item.sizes[s]}</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {Object.entries(item.baixasSizes).map(([s, diff]) => (
+                                    <span key={s} className="text-xs bg-red-100 border border-red-200 px-2 py-0.5 rounded-md font-bold text-red-700">
+                                      {s}: {diff}
                                     </span>
-                                  );
-                                })}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            ))
+                          }
+                        </div>
                       </div>
+
+                      {/* ENTRADAS (Auditoria > Sistema) */}
+                      <div className="border border-green-200 rounded-xl overflow-hidden">
+                        <div className="bg-green-50 px-4 py-2.5 flex items-center gap-2 border-b border-green-200">
+                          <ArrowUpCircle className="w-4 h-4 text-green-600"/>
+                          <span className="font-bold text-green-800 text-sm">Entradas — Auditoria maior</span>
+                          <span className="ml-auto text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full font-bold">{entryItems.length}</span>
+                        </div>
+                        <div className="divide-y divide-green-50 max-h-96 overflow-y-auto">
+                          {entryItems.length === 0
+                            ? <div className="py-6 text-center text-xs text-gray-400">Nenhuma entrada</div>
+                            : entryItems.map(item => (
+                              <div key={item.id} className="px-4 py-2.5 hover:bg-green-50/50">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="font-semibold text-sm text-gray-800">{item.REFERENCIA}</span>
+                                  {item.COR1DESC && <span className="text-xs text-gray-400">{item.COR1DESC}</span>}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {Object.entries(item.entradasSizes).map(([s, diff]) => (
+                                    <span key={s} className="text-xs bg-green-100 border border-green-200 px-2 py-0.5 rounded-md font-bold text-green-700">
+                                      {s}: +{diff}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </div>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200"><div className="text-xs text-blue-600 font-bold uppercase">Total de Itens</div><div className="text-3xl font-bold text-blue-900 mt-1">{dashboardStats.totalItems}</div></div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200"><div className="text-xs text-purple-600 font-bold uppercase">Total de Peças</div><div className="text-3xl font-bold text-purple-900 mt-1">{dashboardStats.totalPieces}</div></div>
-                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200"><div className="text-xs text-indigo-600 font-bold uppercase">Média por Item</div><div className="text-3xl font-bold text-indigo-900 mt-1">{dashboardStats.avgPiecesPerItem}</div></div>
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200"><div className="text-xs text-gray-600 font-bold uppercase">Estoque Zero</div><div className="text-3xl font-bold text-gray-700 mt-1">{dashboardStats.zeroStock}</div></div>
               </div>
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-indigo-600"/> Distribuição de Estoque</h3><span className="text-xs text-gray-400 flex items-center gap-1"><ChevronRight className="w-3 h-3"/> Clique para detalhar</span></div>
-                <div className="space-y-4">
-                  {dashboardStats.sortedCategories.map(([cat, data]) => {
-                    const max = dashboardStats.sortedCategories.length > 0 ? dashboardStats.sortedCategories[0][1].total : 1;
-                    const pct = (data.total / max) * 100;
-                    return (
-                      <div key={cat} className="cursor-pointer group" onClick={() => setSelectedCategory(cat)}>
-                        <div className="flex justify-between text-sm font-medium mb-1.5">
-                          <span className="text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5">
-                            {cat}<ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-indigo-500"/>
-                          </span>
-                          <span className="text-indigo-700 font-bold">{data.total} peças</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-3 group-hover:bg-indigo-100">
-                          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full" style={{ width: pct + '%' }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200"><h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2"><AlertOctagon className="w-4 h-4"/> Últimas Peças (1un)</h3><div className="max-h-64 overflow-y-auto">{dashboardStats.lastPieces.map(i=><div key={i.id} className="text-sm border-b border-orange-200 py-2 flex justify-between"><span className="font-medium">{i.REFERENCIA}</span><span className="font-bold text-orange-700">TAM {sizeColumns.find(s=>i.sizes[s]>0)}</span></div>)}</div></div>
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200"><h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><Package className="w-4 h-4"/> Estoque Pesado</h3><div className="max-h-64 overflow-y-auto">{heavyStockToDisplay.map(i=><div key={i.id} className="text-sm border-b border-blue-200 py-2 flex justify-between"><span className="font-medium">{i.REFERENCIA}</span><span className="font-bold text-blue-700">{i.QTDE} un</span></div>)}</div></div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* ABA 4: MARKETING — SPRINT 3 UPGRADED */}
-        {activeTab === 'marketing' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-pink-700 flex items-center gap-2 text-xl"><Share2 className="w-6 h-6"/> Marketing / Divulgação</h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={()=>{setPrintMode(true);setTimeout(()=>{window.print();setPrintMode(false);},300);}} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-pink-300 no-print"><Printer className="w-4 h-4"/> Imprimir</button>
-                  <div className="text-xs space-x-2">
-                    <button onClick={()=>setMarketingSort('recent')} className={`px-3 py-1.5 rounded-lg ${marketingSort==='recent'?'bg-pink-100 text-pink-800 font-bold':'bg-gray-100 hover:bg-gray-200'}`}>Recentes</button>
-                    <button onClick={()=>setMarketingSort('no-photo')} className={`px-3 py-1.5 rounded-lg ${marketingSort==='no-photo'?'bg-pink-100 text-pink-800 font-bold':'bg-gray-100 hover:bg-gray-200'}`}>Sem Foto</button>
-                    <button onClick={()=>setMarketingSort('to-post')} className={`px-3 py-1.5 rounded-lg ${marketingSort==='to-post'?'bg-pink-100 text-pink-800 font-bold':'bg-gray-100 hover:bg-gray-200'}`}>Postar</button>
-                  </div>
-                </div>
-              </div>
-              <input type="text" placeholder="Filtrar..." className="w-full border border-gray-300 p-2.5 rounded-lg mb-4 focus:ring-2 focus:ring-pink-400 focus:outline-none" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
-              <div className="space-y-4">
-                {marketingItems.map(item => {
-                  const key = getItemKey(item);
-                  const isDisc = marketingStatus[key]?.discontinued;
-                  const photoUrl = marketingPhotos[key];
-                  const postedAt = marketingPostedAt[key];
-                  // SPRINT 3: days since posted
-                  const daysSincePosted = postedAt ? Math.floor((Date.now() - new Date(postedAt).getTime()) / (1000*60*60*24)) : null;
-                  return (
-                    <div key={key} className={`border rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md ${isDisc?'opacity-50 bg-gray-50':'bg-white'}`}>
-                      <div className="flex gap-4">
-                        {/* SPRINT 3: Photo thumbnail or upload zone */}
-                        <div className="shrink-0">
-                          {photoUrl ? (
-                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 group cursor-pointer" onClick={()=>{setPhotoUploadKey(key);photoInputRef.current?.click();}}>
-                              <img src={photoUrl} alt="produto" className="w-full h-full object-cover"/>
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Eye className="w-4 h-4 text-white"/></div>
-                            </div>
-                          ) : (
-                            <button onClick={()=>{setPhotoUploadKey(key);photoInputRef.current?.click();}} className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 hover:border-pink-400 flex flex-col items-center justify-center text-gray-400 hover:text-pink-500 transition-all">
-                              <ImagePlus className="w-5 h-5 mb-0.5"/><span className="text-xs">Foto</span>
+            </div>
+          );
+        })()}
+
+        {/* ABA 4: DASHBOARD — COM FILTROS */}
+        {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+                <div className="bg-white p-6 rounded-2xl border shadow-lg">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="font-bold text-gray-800 text-xl flex items-center gap-2"><BarChart3 className="w-6 h-6 text-purple-600"/> Dashboard</h2>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setPrintMode(true); setTimeout(() => { window.print(); setPrintMode(false); }, 300); }} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600 transition-all no-print">
+                          <Printer className="w-4 h-4"/> Imprimir
+                        </button>
+                        <button
+                          onClick={() => setShowDashboardFilters(!showDashboardFilters)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                            showDashboardFilters || dashboardSizeFilter || dashboardCategoryFilter
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                          }`}
+                        >
+                          <Filter className="w-4 h-4"/>
+                          Filtros
+                          {(dashboardSizeFilter || dashboardCategoryFilter) && (
+                            <span className="bg-white/30 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
+                              {[dashboardSizeFilter, dashboardCategoryFilter].filter(Boolean).length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* PAINEL DE FILTROS GLOBAL */}
+                    {showDashboardFilters && (
+                      <div className="mb-6 p-5 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200 shadow-inner">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-bold text-purple-800 flex items-center gap-2"><SlidersHorizontal className="w-4 h-4"/> Filtrar Estoque</h3>
+                          {(dashboardSizeFilter || dashboardCategoryFilter) && (
+                            <button
+                              onClick={() => { setDashboardSizeFilter(''); setDashboardCategoryFilter(''); }}
+                              className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
+                            >
+                              <X className="w-3 h-3"/> Limpar filtros
                             </button>
                           )}
                         </div>
-                        <div>
-                          <div className="font-bold text-lg">{item.TIPODESC} <span className="text-gray-500 font-normal text-sm">{item.REFERENCIA}</span></div>
-                          <div className="text-sm text-gray-600 mt-1">{item.MARCADESC} - {item.COR1DESC}</div>
-                          <div className="text-xs mt-2 font-mono bg-gray-100 inline-block px-2 py-1 rounded">Grade: {sizeColumns.filter(s=>item.sizes[s]>0).join(', ')}</div>
-                          {/* SPRINT 3: Posted X days ago tag */}
-                          {daysSincePosted !== null && (
-                            <div className="mt-2">
-                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${daysSincePosted===0?'bg-green-100 text-green-700':daysSincePosted<=7?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600'}`}>
-                                📅 {daysSincePosted===0?'Postado hoje':`Postado há ${daysSincePosted} dia${daysSincePosted!==1?'s':''}`}
+
+                        {/* Filtro por categoria */}
+                        <div className="mb-4">
+                          <div className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-2">Modelo / Categoria</div>
+                          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                            <button
+                              onClick={() => setDashboardCategoryFilter('')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                !dashboardCategoryFilter
+                                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                              }`}
+                            >
+                              Todos
+                            </button>
+                            {dashboardStats.sortedCategories.map(([cat, data]) => (
+                              <button
+                                key={cat}
+                                onClick={() => setDashboardCategoryFilter(dashboardCategoryFilter === cat ? '' : cat)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                  dashboardCategoryFilter === cat
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                                }`}
+                              >
+                                {cat}
+                                <span className={`text-xs px-1 rounded ${dashboardCategoryFilter === cat ? 'bg-white/30 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                  {data.total}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Filtro por tamanho */}
+                        <div className="mb-4">
+                          <div className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-2">Tamanho</div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => setDashboardSizeFilter('')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                !dashboardSizeFilter
+                                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                              }`}
+                            >
+                              Todos
+                            </button>
+                            {allAvailableSizes.map(size => (
+                              <button
+                                key={size}
+                                onClick={() => setDashboardSizeFilter(dashboardSizeFilter === size ? '' : size)}
+                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border min-w-[44px] ${
+                                  dashboardSizeFilter === size
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                                }`}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Resultados dos filtros */}
+                        {(dashboardSizeFilter || dashboardCategoryFilter) && (
+                          <div className="mt-5 border-t border-purple-200 pt-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-bold text-purple-900 text-sm flex items-center gap-2">
+                                <Search className="w-4 h-4"/>
+                                {dashboardFilteredItems.length} modelo{dashboardFilteredItems.length !== 1 ? 's' : ''} encontrado{dashboardFilteredItems.length !== 1 ? 's' : ''}
+                                {dashboardSizeFilter && <span className="bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full text-xs">Tam. {dashboardSizeFilter}</span>}
+                                {dashboardCategoryFilter && <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full text-xs">{dashboardCategoryFilter}</span>}
+                              </h4>
+                              <span className="text-xs text-purple-600 font-bold">
+                                {dashboardFilteredItems.reduce((acc, i) => acc + calculateTotal(i.sizes), 0)} peças
                               </span>
                             </div>
-                          )}
-                        </div>
+                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                              {dashboardFilteredItems.length === 0 ? (
+                                <div className="text-center py-8 text-gray-400">
+                                  <Package className="w-10 h-10 mx-auto mb-2 opacity-30"/>
+                                  <p className="text-sm">Nenhum item encontrado com estes filtros</p>
+                                </div>
+                              ) : dashboardFilteredItems.map(item => {
+                                const sizesInStock = sizeColumns.filter(s => (parseInt(item.sizes[s]) || 0) > 0);
+                                const total = calculateTotal(item.sizes);
+                                return (
+                                  <div key={item.id} className="bg-white rounded-xl border border-purple-100 p-3 hover:shadow-md hover:border-purple-300 transition-all">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <div>
+                                        <div className="font-bold text-gray-900 text-sm">{item.TIPODESC}</div>
+                                        <div className="text-xs text-purple-700 font-mono">{item.REFERENCIA}</div>
+                                        <div className="text-xs text-gray-500">{item.MARCADESC}{item.COR1DESC ? ` · ${item.COR1DESC}` : ''}</div>
+                                      </div>
+                                      <span className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                        total === 1 ? 'bg-orange-100 text-orange-700' :
+                                        total >= 5 ? 'bg-blue-100 text-blue-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {total} {total === 1 ? 'peça' : 'peças'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {sizesInStock.map(s => (
+                                        <span key={s} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border ${
+                                          s === dashboardSizeFilter
+                                            ? 'bg-purple-600 text-white border-purple-600'
+                                            : 'bg-white text-indigo-700 border-indigo-200'
+                                        }`}>
+                                          {s} <span className="text-indigo-400 font-normal">×{item.sizes[s]}</span>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-2 items-start">
-                        <button onClick={()=>toggleMarketing(key,'photo')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.photo?'bg-blue-50 border-blue-300 text-blue-700':'border-gray-300 hover:bg-gray-50'}`}>
-                          {photoUrl?<><Eye className="w-4 h-4 mb-1"/>Foto OK</>:<><Camera className="w-4 h-4 mb-1"/>Sem Foto</>}
-                        </button>
-                        <button onClick={()=>toggleMarketing(key,'catalog')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.catalog?'bg-green-50 border-green-300 text-green-700':'border-gray-300 hover:bg-gray-50'}`}><Smartphone className="w-4 h-4 mb-1"/> {marketingStatus[key]?.catalog?'Catálogo':'Add Whats'}</button>
-                        <button onClick={()=>toggleMarketing(key,'posted')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.posted?'bg-pink-50 border-pink-300 text-pink-700':'border-gray-300 hover:bg-gray-50'}`}><Instagram className="w-4 h-4 mb-1"/> {marketingStatus[key]?.posted?'Postado':'Postar'}</button>
-                        <button onClick={()=>toggleMarketing(key,'discontinued')} className="text-gray-400 hover:text-gray-600 ml-2 transition-colors" title="Fora de Linha"><Archive className="w-4 h-4"/></button>
-                      </div>
+                    )}
+
+                    {/* STATS */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 shadow-sm"><div className="text-xs text-blue-600 font-bold uppercase">Total de Itens</div><div className="text-3xl font-bold text-blue-900 mt-1">{dashboardStats.totalItems}</div></div>
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 shadow-sm"><div className="text-xs text-purple-600 font-bold uppercase">Total de Peças</div><div className="text-3xl font-bold text-purple-900 mt-1">{dashboardStats.totalPieces}</div></div>
+                        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200 shadow-sm"><div className="text-xs text-indigo-600 font-bold uppercase">Média por Item</div><div className="text-3xl font-bold text-indigo-900 mt-1">{dashboardStats.avgPiecesPerItem}</div></div>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200 shadow-sm"><div className="text-xs text-gray-600 font-bold uppercase">Estoque Zero</div><div className="text-3xl font-bold text-gray-700 mt-1">{dashboardStats.zeroStock}</div></div>
                     </div>
-                  );
-                })}
-              </div>
+                    
+                    {/* DISTRIBUIÇÃO DE ESTOQUE — clicável */}
+                    <div className="mb-8">
+                       <div className="flex items-center justify-between mb-4">
+                         <h3 className="font-bold text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-indigo-600"/> Distribuição de Estoque</h3>
+                         <span className="text-xs text-gray-400 flex items-center gap-1"><ChevronRight className="w-3 h-3"/> Clique para detalhar</span>
+                       </div>
+                       <div className="space-y-4">
+                         {dashboardStats.sortedCategories.map(([cat, data]) => {
+                            const max = dashboardStats.sortedCategories.length > 0 ? dashboardStats.sortedCategories[0][1].total : 1;
+                            const pct = (data.total / max) * 100;
+                            return (
+                                <div
+                                  key={cat}
+                                  className="cursor-pointer group"
+                                  onClick={() => setSelectedCategory(cat)}
+                                >
+                                    <div className="flex justify-between text-sm font-medium mb-1.5">
+                                      <span className="text-gray-700 group-hover:text-indigo-700 transition-colors flex items-center gap-1.5">
+                                        {cat}
+                                        <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0 text-indigo-500"/>
+                                      </span>
+                                      <span className="text-indigo-700 font-bold">{data.total} peças</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden shadow-sm group-hover:bg-indigo-100 transition-colors">
+                                      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 group-hover:from-indigo-600 group-hover:to-purple-700" style={{ width: `${pct}%` }}></div>
+                                    </div>
+                                </div>
+                            );
+                         })}
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 shadow-sm">
+                            <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2"><AlertOctagon className="w-4 h-4"/> Últimas Peças (1un)</h3>
+                            <div className="max-h-64 overflow-y-auto">
+                                {dashboardStats.lastPieces.map(i => (
+                                    <div key={i.id} className="text-sm border-b border-orange-200 py-2 flex justify-between hover:bg-orange-50 transition-colors">
+                                        <span className="font-medium">{i.REFERENCIA}</span>
+                                        <span className="font-bold text-orange-700">TAM {sizeColumns.find(s => i.sizes[s] > 0)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 shadow-sm">
+                             <h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><Package className="w-4 h-4"/> Estoque Pesado</h3>
+                             <div className="max-h-64 overflow-y-auto">
+                                {heavyStockToDisplay.map(i => (
+                                    <div key={i.id} className="text-sm border-b border-blue-200 py-2 flex justify-between hover:bg-blue-50 transition-colors">
+                                        <span className="font-medium">{i.REFERENCIA}</span>
+                                        <span className="font-bold text-blue-700">{i.QTDE} un</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
+        )}
+
+        {activeTab === 'marketing' && (
+            <div className="space-y-6">
+                 <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+                      <div className="flex justify-between items-center mb-4">
+                          <h2 className="font-bold text-pink-700 flex items-center gap-2 text-xl"><Share2 className="w-6 h-6"/> Marketing / Divulgação</h2>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => { setPrintMode(true); setTimeout(() => { window.print(); setPrintMode(false); }, 300); }} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600 transition-all no-print">
+                              <Printer className="w-4 h-4"/> Imprimir
+                            </button>
+                            <div className="text-xs space-x-2">
+                              <button onClick={() => setMarketingSort('recent')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'recent' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Recentes</button>
+                              <button onClick={() => setMarketingSort('no-photo')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'no-photo' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Sem Foto</button>
+                              <button onClick={() => setMarketingSort('to-post')} className={`px-3 py-1.5 rounded-lg transition-all ${marketingSort === 'to-post' ? 'bg-pink-100 text-pink-800 font-bold shadow-sm' : 'bg-gray-100 hover:bg-gray-200'}`}>Postar</button>
+                            </div>
+                          </div>
+                      </div>
+                      <input type="text" placeholder="Filtrar..." className="w-full border border-gray-300 p-2.5 rounded-lg mb-4 focus:ring-2 focus:ring-pink-400 focus:outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
+                      <div className="space-y-4">
+                          {marketingItems.map(item => {
+                              const key = getItemKey(item);
+                              const isDisc = marketingStatus[key]?.discontinued;
+                              return (
+                                  <div key={key} className={`border rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md ${isDisc ? 'opacity-50 bg-gray-50' : 'bg-white'}`}>
+                                      <div>
+                                          <div className="font-bold text-lg">{item.TIPODESC} <span className="text-gray-500 font-normal text-sm">{item.REFERENCIA}</span></div>
+                                          <div className="text-sm text-gray-600 mt-1">{item.MARCADESC} - {item.COR1DESC}</div>
+                                          <div className="text-xs mt-2 font-mono bg-gray-100 inline-block px-2 py-1 rounded">Grade: {sizeColumns.filter(s => item.sizes[s] > 0).join(', ')}</div>
+                                      </div>
+                                      <div className="flex gap-2">
+                                          <button onClick={() => toggleMarketing(key, 'photo')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.photo ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Camera className="w-4 h-4 mb-1"/> {marketingStatus[key]?.photo ? 'Foto OK' : 'Sem Foto'}</button>
+                                          <button onClick={() => toggleMarketing(key, 'catalog')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.catalog ? 'bg-green-50 border-green-300 text-green-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Smartphone className="w-4 h-4 mb-1"/> {marketingStatus[key]?.catalog ? 'Catálogo' : 'Add Whats'}</button>
+                                          <button onClick={() => toggleMarketing(key, 'posted')} className={`p-2.5 rounded-lg border text-xs flex flex-col items-center w-20 transition-all ${marketingStatus[key]?.posted ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-sm' : 'border-gray-300 hover:bg-gray-50'}`}><Instagram className="w-4 h-4 mb-1"/> {marketingStatus[key]?.posted ? 'Postado' : 'Postar'}</button>
+                                          <button onClick={() => toggleMarketing(key, 'discontinued')} className="text-gray-400 hover:text-gray-600 ml-2 transition-colors" title="Fora de Linha"><Archive className="w-4 h-4"/></button>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                 </div>
+            </div>
         )}
 
         {activeTab === 'viability' && renderViabilityTab()}
         {activeTab === 'goals' && renderGoalsTab()}
-        {activeTab === 'hr' && renderHrTab()}
+
       </main>
     </div>
   );
 };
 
 export default App;
-// BUILD: 20260228050000 
