@@ -408,12 +408,17 @@ const App = () => {
       return { year: y, sales };
     }).filter(d => d.sales > 0);
     if (salesData.length < 2) return { trend: 'neutral', percent: 0, arrow: '→' };
-    let totalGrowth = 0, validComparisons = 0;
+    // Variações ano a ano com peso crescente (anos mais recentes valem mais)
+    let weightedSum = 0, weightTotal = 0;
     for (let i = 1; i < salesData.length; i++) {
       const growth = ((salesData[i].sales - salesData[i-1].sales) / salesData[i-1].sales) * 100;
-      if (Math.abs(growth) < 50) { totalGrowth += growth; validComparisons++; }
+      if (Math.abs(growth) < 50) {
+        const weight = i; // i=1 peso 1, i=2 peso 2, i=3 peso 3... recente = maior peso
+        weightedSum += growth * weight;
+        weightTotal += weight;
+      }
     }
-    const avgGrowth = validComparisons > 0 ? totalGrowth / validComparisons : 0;
+    const avgGrowth = weightTotal > 0 ? weightedSum / weightTotal : 0;
     if (avgGrowth > 3) return { trend: 'up', percent: avgGrowth, arrow: '↗' };
     if (avgGrowth < -3) return { trend: 'down', percent: avgGrowth, arrow: '↘' };
     return { trend: 'neutral', percent: avgGrowth, arrow: '→' };
@@ -1369,34 +1374,68 @@ const App = () => {
                     <div className="text-sm font-bold opacity-90">{lojaMedal ? `Loja: ${lojaMedal}` : 'Loja: Abaixo do Bronze'}</div>
                   </div>
                   <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Individual performance */}
+                    {/* Individual performance — barras de progresso */}
                     <div>
-                      <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Performance Individual</div>
-                      <div className="space-y-2">
-                        {curSellers.map(seller => {
+                      <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Rastreamento Individual</div>
+                      <div className="space-y-4">
+                        {curSellers.map((seller, idx) => {
                           const v = seller.totalSales;
                           const hitO = v >= oInd, hitP = v >= pInd, hitB = v >= bInd;
                           const medal = hitO ? '🥇' : hitP ? '🥈' : hitB ? '🥉' : null;
-                          const bgClass = hitO ? 'bg-yellow-50 border-yellow-200' : hitP ? 'bg-slate-50 border-slate-200' : hitB ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-100';
-                          const nameColor = hitO ? '#d97706' : hitP ? '#64748b' : hitB ? '#92400e' : '#dc2626';
-                          let statusLine;
-                          if (hitO) {
-                            statusLine = { text: `Ouro ✅ +${formatCurrency(v - oInd)} acima`, color: '#d97706' };
-                          } else if (hitP) {
-                            statusLine = { text: `Prata ✅  |  Faltou ${formatCurrency(oInd - v)} p/ Ouro 🥇`, color: '#64748b' };
-                          } else if (hitB) {
-                            statusLine = { text: `Bronze ✅  |  Faltou ${formatCurrency(pInd - v)} p/ Prata 🥈`, color: '#b45309' };
-                          } else {
-                            statusLine = { text: `Faltou ${formatCurrency(bInd - v)} p/ Bronze 🥉`, color: '#dc2626' };
-                          }
+                          const SELLER_COLORS = ['#f59e0b', '#10b981', '#e11d48', '#3b82f6', '#a855f7'];
+                          const sellerColor = SELLER_COLORS[idx % SELLER_COLORS.length];
+                          // Meta atual = próxima a ser atingida
+                          const nextTarget = hitO ? oInd : hitP ? oInd : hitB ? pInd : bInd;
+                          const prevTarget = hitO ? pInd : hitP ? bInd : 0;
+                          const pctToNext = nextTarget > 0 ? Math.min(100, ((v - prevTarget) / (nextTarget - prevTarget)) * 100) : 100;
+                          const nextLabel = hitO ? 'Ouro ✅' : hitP ? `falta ${formatCurrency(oInd - v)} p/ Ouro` : hitB ? `falta ${formatCurrency(pInd - v)} p/ Prata` : `falta ${formatCurrency(bInd - v)} p/ Bronze`;
+                          const tierColor = hitO ? '#d97706' : hitP ? '#64748b' : hitB ? '#92400e' : '#dc2626';
                           return (
-                            <div key={seller.sellerName} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${bgClass}`}>
-                              <span className="text-base shrink-0">{medal || '—'}</span>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-bold truncate" style={{color: nameColor}}>{seller.sellerName}</div>
-                                <div className="text-xs mt-0.5" style={{color: statusLine.color}}>{statusLine.text}</div>
+                            <div key={seller.sellerName} className="bg-gray-50 rounded-xl border border-gray-200 p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background: sellerColor}}/>
+                                  <span className="font-bold text-sm text-gray-900">{seller.sellerName}</span>
+                                  {medal && <span className="text-base">{medal}</span>}
+                                </div>
+                                <span className="font-bold text-gray-800">{formatCurrency(v)}</span>
                               </div>
-                              <div className="text-xs font-bold text-gray-700 shrink-0">{formatCurrency(v)}</div>
+                              {/* Progress bar segmentada: Bronze / Prata / Ouro */}
+                              <div className="relative mb-1">
+                                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden flex">
+                                  {/* Bronze segment — até 33% */}
+                                  <div className="h-full rounded-l-full transition-all" style={{
+                                    width: `${Math.min(100, Math.min(v, bInd) / oInd * 100)}%`,
+                                    background: v >= bInd ? '#b45309' : '#f59e0b88'
+                                  }}/>
+                                  {/* Prata segment */}
+                                  <div className="h-full transition-all" style={{
+                                    width: `${Math.max(0, Math.min(v, pInd) / oInd * 100 - bInd / oInd * 100)}%`,
+                                    background: v >= pInd ? '#64748b' : '#94a3b866'
+                                  }}/>
+                                  {/* Ouro segment */}
+                                  <div className="h-full rounded-r-full transition-all" style={{
+                                    width: `${Math.max(0, Math.min(v, oInd) / oInd * 100 - pInd / oInd * 100)}%`,
+                                    background: v >= oInd ? '#d97706' : '#eab30866'
+                                  }}/>
+                                </div>
+                                {/* Marcadores de meta */}
+                                {[{val: bInd, color: '#b45309'}, {val: pInd, color: '#94a3b8'}, {val: oInd, color: '#d97706'}].map(({val, color}) => (
+                                  val > 0 && val <= oInd * 1.1 ? <div key={val} className="absolute top-0 h-3 w-0.5 opacity-60" style={{left: `${Math.min(100, val/oInd*100)}%`, background: color}}/> : null
+                                ))}
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span style={{color: tierColor}}>{nextLabel}</span>
+                                <span className="text-gray-400">{seller.daysWorked}d · {seller.salesCount} vendas</span>
+                              </div>
+                              {/* Metas em linha */}
+                              <div className="flex gap-2 mt-2">
+                                {[{label: '🥉', val: bInd, hit: hitB}, {label: '🥈', val: pInd, hit: hitP}, {label: '🥇', val: oInd, hit: hitO}].map(t => (
+                                  <div key={t.label} className={`flex-1 text-center py-0.5 rounded text-xs font-bold border ${t.hit ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-100 text-gray-400'}`}>
+                                    {t.label} {formatCurrency(t.val)}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           );
                         })}
