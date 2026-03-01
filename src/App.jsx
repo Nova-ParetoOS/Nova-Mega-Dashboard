@@ -2352,7 +2352,7 @@ const App = () => {
             • Seção 3: Divergências (isoladas por tamanho)
         ═══════════════════════════════════════════════════ */}
         {['audit','system','diff'].includes(activeTab) && (() => {
-          const storeOptions = userRole === 'owner' ? ['3','4','7','8','10'] : userStoreAccess;
+          const storeOptions = Object.keys(STORE_CONFIGS);
 
           // ── Zerar Estoque: copia lista do ERP com qty=0 ──────
           const handleZerarEstoque = async () => {
@@ -2362,10 +2362,6 @@ const App = () => {
               return { ...item, sizes: z, QTDE: 0 };
             });
             setAuditData(zeroed);
-            await supabase.from('audit_data').delete().eq('store_code', selectedStore);
-            if (zeroed.length > 0) {
-              await supabase.from('audit_data').insert(zeroed.map(i => itemToDb(i, selectedStore)));
-            }
           };
 
           // ── Divergências isoladas por tamanho ────────────────
@@ -2407,7 +2403,7 @@ const App = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {storeOptions.map(s => (
-                      <button key={s} onClick={async () => { setSelectedStore(s); setTimeout(loadStoreData, 50); }}
+                      <button key={s} onClick={() => setSelectedStore(s)}
                         className={'px-4 py-2 rounded-xl text-sm font-bold transition-all ' +
                           (selectedStore === s
                             ? 'bg-white text-indigo-900 shadow-lg scale-105'
