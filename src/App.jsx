@@ -340,6 +340,23 @@ const App = () => {
   // Goals tab: selected seller names for chip-based count
   const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
 
+  // --- RH State ---
+  const [hrCandidates, setHrCandidates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('stock_hrCandidates')) || []; } catch { return []; }
+  });
+  const [hrFilterYear, setHrFilterYear] = useState(new Date().getFullYear());
+  const [hrFilterStore, setHrFilterStore] = useState('all');
+  const [hrFilterStatus, setHrFilterStatus] = useState('all');
+  const [hrSearch, setHrSearch] = useState('');
+  const [hrShowForm, setHrShowForm] = useState(false);
+  const [hrEditId, setHrEditId] = useState(null);
+  const [hrForm, setHrForm] = useState({
+    nome: '', telefone: '', cargo: '', loja: '10',
+    status: 'triagem', motivo: '',
+    recebimento_curriculo: new Date().toISOString().slice(0,10),
+    entrevista_data: '', contratacao_data: '', observacoes: ''
+  });
+
   // --- Efeitos de Salvamento ---
   useEffect(() => { localStorage.setItem('stock_systemData', JSON.stringify(systemData)); }, [systemData]);
   useEffect(() => { localStorage.setItem('stock_auditData', JSON.stringify(auditData)); }, [auditData]);
@@ -349,6 +366,7 @@ const App = () => {
   useEffect(() => { localStorage.setItem('stock_sellerOverrides', JSON.stringify(sellerOverrides)); }, [sellerOverrides]);
   useEffect(() => { localStorage.setItem('stock_projectionSellers', JSON.stringify(projectionSellers)); }, [projectionSellers]);
   useEffect(() => { localStorage.setItem('stock_dreValues', JSON.stringify(dreValues)); }, [dreValues]);
+  useEffect(() => { localStorage.setItem('stock_hrCandidates', JSON.stringify(hrCandidates)); }, [hrCandidates]);
 
   useEffect(() => {
     if (auditData.length === 0 && systemData.length > 0) {
@@ -2320,6 +2338,7 @@ const App = () => {
             <button onClick={() => setActiveTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1"/> 3. Divulgação</button>
             <button onClick={() => setActiveTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1"/> 4. DRE</button>
             <button onClick={() => setActiveTab('goals')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Target className="w-4 h-4 inline mr-1"/> 5. Metas</button>
+            <button onClick={() => setActiveTab('hr')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'hr' ? 'border-teal-600 text-teal-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><UserCheck className="w-4 h-4 inline mr-1"/> 6. RH</button>
           </div>
         </nav>
       )}
@@ -3009,6 +3028,309 @@ const App = () => {
 
         {activeTab === 'viability' && renderViabilityTab()}
         {activeTab === 'goals' && renderGoalsTab()}
+
+        {/* ═══════════════════ ABA RH ═══════════════════ */}
+        {activeTab === 'hr' && (() => {
+          const HR_STATUS = [
+            { id: 'triagem',    label: 'Triagem',    color: 'blue',   bg: 'from-blue-500 to-blue-700',   emoji: '📋' },
+            { id: 'entrevista', label: 'Entrevista', color: 'amber',  bg: 'from-amber-500 to-yellow-600', emoji: '🗣️' },
+            { id: 'contratado', label: 'Contratado', color: 'green',  bg: 'from-green-500 to-emerald-700',emoji: '✅' },
+            { id: 'reprovado',  label: 'Reprovado',  color: 'red',    bg: 'from-red-500 to-red-700',      emoji: '❌' },
+          ];
+
+          const CARGO_OPTIONS = ['Vendedora', 'Gerente', 'Caixa', 'Estoquista', 'Auxiliar', 'Outro'];
+          const MOTIVO_OPTIONS = ['', 'Perfil incompatível', 'Salário acima da faixa', 'Desistiu', 'Sem experiência', 'Contratado por outra empresa', 'Sem vagas no momento', 'Outro'];
+
+          // Anos disponíveis: do ano mais antigo de candidato até ano corrente
+          const allYears = [...new Set(hrCandidates.map(c => new Date(c.recebimento_curriculo + 'T00:00:00').getFullYear()))].sort();
+          const yearOptions = allYears.length > 0
+            ? [...new Set([...allYears, new Date().getFullYear()])].sort()
+            : [new Date().getFullYear()];
+
+          // Filtros
+          const filtered = hrCandidates.filter(c => {
+            const cYear = new Date(c.recebimento_curriculo + 'T00:00:00').getFullYear();
+            if (hrFilterYear !== 'all' && cYear !== hrFilterYear) return false;
+            if (hrFilterStore !== 'all' && c.loja !== hrFilterStore) return false;
+            if (hrFilterStatus !== 'all' && c.status !== hrFilterStatus) return false;
+            if (hrSearch && !c.nome.toLowerCase().includes(hrSearch.toLowerCase()) && !c.cargo.toLowerCase().includes(hrSearch.toLowerCase())) return false;
+            return true;
+          });
+
+          const openForm = (candidate = null) => {
+            if (candidate) {
+              setHrEditId(candidate.id);
+              setHrForm({ ...candidate });
+            } else {
+              setHrEditId(null);
+              setHrForm({
+                nome: '', telefone: '', cargo: '', loja: selectedStore || '10',
+                status: 'triagem', motivo: '',
+                recebimento_curriculo: new Date().toISOString().slice(0,10),
+                entrevista_data: '', contratacao_data: '', observacoes: ''
+              });
+            }
+            setHrShowForm(true);
+          };
+
+          const saveCandidate = () => {
+            if (!hrForm.nome.trim()) return;
+            if (hrEditId) {
+              setHrCandidates(prev => prev.map(c => c.id === hrEditId ? { ...hrForm, id: hrEditId } : c));
+            } else {
+              const newId = Date.now();
+              setHrCandidates(prev => [...prev, { ...hrForm, id: newId }]);
+            }
+            setHrShowForm(false);
+            setHrEditId(null);
+          };
+
+          const deleteCandidate = (id) => {
+            if (window.confirm('Remover candidato?')) setHrCandidates(prev => prev.filter(c => c.id !== id));
+          };
+
+          const moveStatus = (id, newStatus) => {
+            setHrCandidates(prev => prev.map(c => {
+              if (c.id !== id) return c;
+              const updated = { ...c, status: newStatus };
+              if (newStatus === 'entrevista' && !updated.entrevista_data) updated.entrevista_data = new Date().toISOString().slice(0,10);
+              if (newStatus === 'contratado' && !updated.contratacao_data) updated.contratacao_data = new Date().toISOString().slice(0,10);
+              return updated;
+            }));
+          };
+
+          const daysSince = (dateStr) => {
+            if (!dateStr) return null;
+            const diff = (Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24);
+            return Math.floor(diff);
+          };
+
+          // Stats
+          const stats = HR_STATUS.map(s => ({ ...s, count: filtered.filter(c => c.status === s.id).length }));
+
+          return (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-gradient-to-br from-white to-teal-50/30 p-6 rounded-2xl border border-teal-100 shadow-lg">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                  <h2 className="text-2xl font-bold text-teal-800 flex items-center gap-2"><UserCheck className="w-6 h-6"/> RH — Candidatos</h2>
+                  <button onClick={() => openForm()}
+                    className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition-all font-medium">
+                    <PlusCircle className="w-4 h-4"/> Novo Candidato
+                  </button>
+                </div>
+
+                {/* FILTROS */}
+                <div className="flex flex-wrap gap-3">
+                  {/* Ano */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-700 uppercase">Ano:</span>
+                    <button onClick={() => setHrFilterYear('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterYear === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
+                      Todos
+                    </button>
+                    {yearOptions.map(y => (
+                      <button key={y} onClick={() => setHrFilterYear(y)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterYear === y ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Loja */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-700 uppercase">Loja:</span>
+                    <button onClick={() => setHrFilterStore('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStore === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
+                      Todas
+                    </button>
+                    {Object.entries(STORE_CONFIGS).map(([k,v]) => (
+                      <button key={k} onClick={() => setHrFilterStore(k)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStore === k ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
+                        {v.name}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Status */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-700 uppercase">Status:</span>
+                    <button onClick={() => setHrFilterStatus('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStatus === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
+                      Todos
+                    </button>
+                    {HR_STATUS.map(s => (
+                      <button key={s.id} onClick={() => setHrFilterStatus(hrFilterStatus === s.id ? 'all' : s.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStatus === s.id ? `bg-${s.color}-600 text-white border-${s.color}-600 shadow-sm` : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
+                        {s.emoji} {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Busca */}
+                  <div className="relative ml-auto">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"/>
+                    <input value={hrSearch} onChange={e => setHrSearch(e.target.value)}
+                      placeholder="Buscar nome ou cargo..."
+                      className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-400 focus:outline-none w-48"/>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-3 mt-5">
+                  {stats.map(s => (
+                    <div key={s.id} className={`bg-gradient-to-br ${s.bg} text-white p-3 rounded-xl shadow-sm`}>
+                      <div className="text-xs opacity-80 font-medium">{s.emoji} {s.label}</div>
+                      <div className="text-2xl font-bold mt-0.5">{s.count}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* KANBAN */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {HR_STATUS.map(col => {
+                  const colCandidates = filtered.filter(c => c.status === col.id).sort((a,b) => new Date(b.recebimento_curriculo) - new Date(a.recebimento_curriculo));
+                  return (
+                    <div key={col.id} className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                      <div className={`bg-gradient-to-r ${col.bg} text-white px-4 py-3 flex items-center justify-between`}>
+                        <span className="font-bold text-sm">{col.emoji} {col.label}</span>
+                        <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full">{colCandidates.length}</span>
+                      </div>
+                      <div className="p-3 space-y-3 min-h-32">
+                        {colCandidates.length === 0 && (
+                          <div className="text-center py-6 text-gray-300 text-xs">Nenhum candidato</div>
+                        )}
+                        {colCandidates.map(c => {
+                          const dias = daysSince(c.recebimento_curriculo);
+                          const slaAlert = col.id === 'triagem' && dias > 5;
+                          return (
+                            <div key={c.id} className={`bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition-all ${slaAlert ? 'border-red-300' : 'border-gray-100'}`}>
+                              <div className="flex items-start justify-between gap-1 mb-1.5">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold text-sm text-gray-900 truncate">{c.nome}</div>
+                                  <div className="text-xs text-gray-500">{c.cargo} · {STORE_CONFIGS[c.loja]?.name || c.loja}</div>
+                                </div>
+                                <button onClick={() => openForm(c)} className="text-gray-300 hover:text-teal-600 shrink-0 transition-colors p-0.5">
+                                  <Search className="w-3.5 h-3.5"/>
+                                </button>
+                              </div>
+                              {/* SLA tag */}
+                              {dias !== null && (
+                                <div className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mb-2 ${slaAlert ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-500'}`}>
+                                  <Calendar className="w-3 h-3"/> {dias}d {slaAlert ? '⚠️ SLA' : ''}
+                                </div>
+                              )}
+                              {c.observacoes && <div className="text-xs text-gray-400 italic truncate mb-2">{c.observacoes}</div>}
+                              {/* Mover para próximo status */}
+                              <div className="flex gap-1 flex-wrap">
+                                {HR_STATUS.filter(s => s.id !== col.id).map(s => (
+                                  <button key={s.id} onClick={() => moveStatus(c.id, s.id)}
+                                    className="text-xs px-2 py-0.5 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700 transition-all">
+                                    → {s.label}
+                                  </button>
+                                ))}
+                                <button onClick={() => deleteCandidate(c.id)} className="text-xs px-2 py-0.5 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 transition-all ml-auto">
+                                  <Trash2 className="w-3 h-3"/>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* MODAL FORMULÁRIO */}
+              {hrShowForm && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setHrShowForm(false)}>
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                    <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+                      <h3 className="font-bold text-lg">{hrEditId ? 'Editar Candidato' : 'Novo Candidato'}</h3>
+                      <button onClick={() => setHrShowForm(false)} className="text-white/70 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Nome *</label>
+                          <input value={hrForm.nome} onChange={e => setHrForm(p => ({...p, nome: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none" placeholder="Nome completo"/>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Telefone</label>
+                          <input value={hrForm.telefone} onChange={e => setHrForm(p => ({...p, telefone: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none" placeholder="(11) 9xxxx-xxxx"/>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Cargo</label>
+                          <select value={hrForm.cargo} onChange={e => setHrForm(p => ({...p, cargo: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
+                            <option value="">Selecione...</option>
+                            {CARGO_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Loja</label>
+                          <select value={hrForm.loja} onChange={e => setHrForm(p => ({...p, loja: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
+                            {Object.entries(STORE_CONFIGS).map(([k,v]) => <option key={k} value={k}>{v.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Status</label>
+                          <select value={hrForm.status} onChange={e => setHrForm(p => ({...p, status: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
+                            {HR_STATUS.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Recebimento Currículo</label>
+                          <input type="date" value={hrForm.recebimento_curriculo} onChange={e => setHrForm(p => ({...p, recebimento_curriculo: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none"/>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Data Entrevista</label>
+                          <input type="date" value={hrForm.entrevista_data} onChange={e => setHrForm(p => ({...p, entrevista_data: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none"/>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Data Contratação</label>
+                          <input type="date" value={hrForm.contratacao_data} onChange={e => setHrForm(p => ({...p, contratacao_data: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none"/>
+                        </div>
+                        {(hrForm.status === 'reprovado') && (
+                          <div className="col-span-2">
+                            <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Motivo da Reprovação</label>
+                            <select value={hrForm.motivo} onChange={e => setHrForm(p => ({...p, motivo: e.target.value}))}
+                              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
+                              {MOTIVO_OPTIONS.map(m => <option key={m} value={m}>{m || 'Selecione...'}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        <div className="col-span-2">
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Observações</label>
+                          <textarea value={hrForm.observacoes} onChange={e => setHrForm(p => ({...p, observacoes: e.target.value}))}
+                            rows={3} className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none resize-none" placeholder="Anotações livres..."/>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 pt-2">
+                        <button onClick={saveCandidate} disabled={!hrForm.nome.trim()}
+                          className="flex-1 bg-gradient-to-r from-teal-600 to-teal-700 text-white font-bold py-2.5 rounded-xl hover:from-teal-700 hover:to-teal-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                          {hrEditId ? 'Salvar Alterações' : 'Adicionar Candidato'}
+                        </button>
+                        {hrEditId && (
+                          <button onClick={() => { deleteCandidate(hrEditId); setHrShowForm(false); }}
+                            className="px-4 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-all">
+                            <Trash2 className="w-4 h-4"/>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       </main>
     </div>
