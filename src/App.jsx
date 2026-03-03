@@ -482,14 +482,15 @@ const App = () => {
       ? last3YearsValid.reduce((a, b) => a + b, 0) / last3YearsValid.length
       : 0;
 
-    // Recorde histórico (todos os anos disponíveis)
+    // Recorde histórico INDIVIDUAL (maior venda de um único vendedor em qualquer ano)
     const allYearsForRecord = [2021, 2022, 2023, 2024, 2025, 2026];
-    const allSales = allYearsForRecord.map(y => {
+    const allIndividualSales = allYearsForRecord.flatMap(y => {
       const periodKey = `${y}-${String(month).padStart(2, '0')}`;
-      return salesHistory.filter(h => h.storeCode == storeId && h.period === periodKey)
-        .reduce((acc, r) => acc + r.totalSales, 0);
-    }).filter(v => v > 10000);
-    const recorde = allSales.length > 0 ? Math.max(...allSales) : 0;
+      return salesHistory
+        .filter(h => h.storeCode == storeId && h.period === periodKey && h.totalSales > 5000)
+        .map(h => h.totalSales);
+    });
+    const recorde = allIndividualSales.length > 0 ? Math.max(...allIndividualSales) : 0;
 
     // F_vend: maior dos últimos 3 anos ÷ média dos últimos 3 anos
     const maiorUltimos3Anos = last3YearsValid.length > 0 ? Math.max(...last3YearsValid) : 0;
@@ -517,38 +518,36 @@ const App = () => {
     // Fórmula: (Média 3 anos × 1,10) ÷ Vendedoras
     // Travas: P_ind >= B_ind  e  P_ind <= Recorde × 1,05
     // =====================================================
-    const prataIndBase = (baseMedia * 1.10) / numSellers;
-    const prataIndMin = metaBronzeInd;
-    const prataIndMax = recorde > 0 ? (recorde * 1.05) / numSellers : Infinity;
-    const metaPrataInd = roundToSpecial(Math.min(Math.max(prataIndBase, prataIndMin), prataIndMax));
+    // =====================================================
+    // 3. META PRATA INDIVIDUAL (P_ind) — Spec v2.2
+    // Fórmula: MAX(B_ind ; round900((M * 1.10) / V))
+    // Trava: resultado final <= Recorde × 1.05 / V
+    // =====================================================
+    const prataIndRound = roundToSpecial((baseMedia * 1.10) / numSellers);
+    const prataIndMax   = recorde > 0 ? recorde * 1.05 : Infinity;
+    const metaPrataInd  = Math.min(Math.max(metaBronzeInd, prataIndRound), prataIndMax);
 
     // =====================================================
-    // 4. META PRATA LOJA (P_loja) — Lógica 2.1
-    // Fórmula: P_ind × Vendedoras
-    // Trava: P_loja >= B_loja
+    // 4. META PRATA LOJA (P_loja) — Spec v2.2
+    // Fórmula: MAX(B_loja ; round900(P_ind × V))
     // =====================================================
-    const prataLojaRaw = metaPrataInd * numSellers;
-    const metaPrataLoja = roundToSpecial(Math.max(prataLojaRaw, metaBronzeLoja));
+    const metaPrataLoja = Math.max(metaBronzeLoja, roundToSpecial(metaPrataInd * numSellers));
 
     // =====================================================
-    // 6. META OURO LOJA (O_loja) — calculada ANTES do individual
-    // Fórmula: MAX(Break-Even ; Média 3 anos × 1,15 × 1,02)
-    // Trava: O_loja >= P_loja
+    // 5. META OURO LOJA (O_loja) — Spec v2.2 (calculada ANTES de O_ind)
+    // Fórmula: MAX(P_loja ; BE ; round900(M × 1.15 × 1.02))
     // =====================================================
-    const ouroLojaA = breakEven;
-    const ouroLojaB = mediaUltimos3Anos > 0 ? mediaUltimos3Anos * 1.15 * 1.02 : 0;
-    const ouroLojaRaw = Math.max(ouroLojaA, ouroLojaB);
-    const metaOuroLoja = roundToSpecial(Math.max(ouroLojaRaw, metaPrataLoja));
+    const ouroLojaHist  = mediaUltimos3Anos > 0 ? roundToSpecial(mediaUltimos3Anos * 1.15 * 1.02) : 0;
+    const metaOuroLoja  = Math.max(metaPrataLoja, breakEven, ouroLojaHist);
 
     // =====================================================
-    // 5. META OURO INDIVIDUAL (O_ind)
-    // Fórmula: MAX(20.000 ; O_loja ÷ Vendedoras)
-    // Travas: O_ind >= P_ind  e  O_ind <= Recorde × 1,15
+    // 6. META OURO INDIVIDUAL (O_ind) — Spec v2.2
+    // Fórmula: MAX(20000 ; P_ind ; round900(O_loja / V))
+    // Trava: resultado final <= Recorde × 1.15
     // =====================================================
-    const ouroIndBase = Math.max(20000, metaOuroLoja / numSellers);
-    const ouroIndMin = metaPrataInd;
-    const ouroIndMax = recorde > 0 ? (recorde * 1.15) / numSellers : Infinity;
-    const metaOuroInd = roundToSpecial(Math.min(Math.max(ouroIndBase, ouroIndMin), ouroIndMax));
+    const ouroIndRound = roundToSpecial(metaOuroLoja / numSellers);
+    const ouroIndMax   = recorde > 0 ? recorde * 1.15 : Infinity;
+    const metaOuroInd  = Math.min(Math.max(20000, metaPrataInd, ouroIndRound), ouroIndMax);
 
     // === HISTÓRICO PARA O GRÁFICO ===
     const historyYears = [2021, 2022, 2023, 2024, 2025];
@@ -576,8 +575,15 @@ const App = () => {
   };
 
   // --- Memos ---
-  const filteredSystemData = useMemo(() => filterData(systemData), [systemData, filterData]);
-  const filteredAuditData = useMemo(() => filterData(auditData), [auditData, filterData]);
+  // Filtro por loja na aba Auditoria (systemData e auditData separados por store_code)
+  const storeSystemData = useMemo(() =>
+    systemData.filter(i => (i.store_code || i.storeCode) === selectedStore),
+  [systemData, selectedStore]);
+  const storeAuditData = useMemo(() =>
+    auditData.filter(i => (i.store_code || i.storeCode) === selectedStore),
+  [auditData, selectedStore]);
+  const filteredStoreSystemData = useMemo(() => filterData(storeSystemData), [storeSystemData, filterData]);
+  const filteredStoreAuditData  = useMemo(() => filterData(storeAuditData),  [storeAuditData,  filterData]);
 
   const differences = useMemo(() => {
     return systemData.map(sys => {
@@ -599,11 +605,9 @@ const App = () => {
 
   // Dados de auditoria filtrados pela loja selecionada no dashboard
   const dashboardAuditData = useMemo(() => {
-    if (dashboardStore === 'all') return auditData;
-    // Se os itens têm store_code, filtrar; caso contrário, mostrar todos (compatibilidade)
-    const hasStoreCodes = auditData.some(i => i.store_code || i.storeCode);
-    if (!hasStoreCodes) return auditData;
-    return auditData.filter(i => (i.store_code || i.storeCode) === dashboardStore);
+    const storeFilter = dashboardStore === 'all' ? null : dashboardStore;
+    if (!storeFilter) return auditData;
+    return auditData.filter(i => (i.store_code || i.storeCode) === storeFilter);
   }, [auditData, dashboardStore]);
 
   const dashboardStats = useMemo(() => {
@@ -667,7 +671,12 @@ const App = () => {
   }, []);
 
   const confirmFillAuditWithSystem = () => {
-    setAuditData(systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) })));
+    // Preencher auditoria apenas com os itens da loja selecionada, mantendo outras lojas
+    const storeItems = systemData.filter(i => (i.store_code || i.storeCode) === selectedStore);
+    setAuditData(prev => [
+      ...prev.filter(i => (i.store_code || i.storeCode) !== selectedStore),
+      ...storeItems.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) }))
+    ]);
     setShowResetModal(false);
   };
   const toggleCompleted = (splitId) => { const newSet = new Set(completedIds); newSet.has(splitId) ? newSet.delete(splitId) : newSet.add(splitId); setCompletedIds(newSet); };
@@ -680,16 +689,17 @@ const App = () => {
         const headers = rows[0].split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ',')).map(h => h.trim().toUpperCase());
         const parsed = rows.slice(1).map((row, idx) => {
             const vals = row.split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ','));
-            const item = { id: idx + 1, sizes: {} };
+            const item = { id: idx + 1, sizes: {}, store_code: importTargetStore };
             headers.forEach((h, i) => { if (sizeColumns.includes(h)) item.sizes[h] = parseInt(vals[i]) || 0; else item[h] = vals[i]; });
             sizeColumns.forEach(s => { if (item.sizes[s] === undefined) item.sizes[s] = 0; });
             item.QTDE = calculateTotal(item.sizes);
             item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || "GENERICO"; item.TIPODESC = item.TIPODESC || "OUTROS";
             return item;
         });
-        setSystemData(parsed); 
-        setAuditData(parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return {...i, sizes: z, QTDE: 0}; }));
-        setCompletedIds(new Set()); setShowImportModal(false); setImportText(""); alert("Importado!");
+        // Manter dados das outras lojas, substituir apenas a loja importada
+        setSystemData(prev => [...prev.filter(i => (i.store_code || i.storeCode) !== importTargetStore), ...parsed]);
+        setAuditData(prev => [...prev.filter(i => (i.store_code || i.storeCode) !== importTargetStore), ...parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return {...i, sizes: z, QTDE: 0}; })]);
+        setCompletedIds(new Set()); setShowImportModal(false); setImportText(""); alert(`Importado para ${STORE_CONFIGS[importTargetStore]?.name || importTargetStore}!`);
       } catch { alert("Erro importação"); }
   };
 
@@ -738,11 +748,9 @@ const App = () => {
   };
 
   const marketingItems = useMemo(() => {
-    // Filtro por loja: igual ao dashboard
+    // Filtro por loja: sem fallback — se loja selecionada, filtrar estritamente
     const storeFiltered = (() => {
       if (marketingStore === 'all') return auditData;
-      const hasStoreCodes = auditData.some(i => i.store_code || i.storeCode);
-      if (!hasStoreCodes) return auditData;
       return auditData.filter(i => (i.store_code || i.storeCode) === marketingStore);
     })();
 
@@ -810,6 +818,7 @@ const App = () => {
 
   const renderViabilityTab = () => {
     const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
+    if (!finData || !finData.config) return <div className="p-8 text-gray-400 text-center">Carregando DRE...</div>;
     const goalsData = getGoalsData(selectedStore, selectedMonth);
     const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
     const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
@@ -829,7 +838,12 @@ const App = () => {
     };
 
     const receitaBrutaBase = totalSalesMonth;
-    const receitaBrutaEdit = dreScenario !== 'base' ? (savedDre.receitaBruta ?? savedDreBase.receitaBruta ?? receitaBrutaBase) : receitaBrutaBase;
+    // Para cenários otimista/pessimista: se não há valor salvo, herda base (ou 0 explícito se base também for 0)
+    const receitaBrutaEdit = dreScenario !== 'base'
+      ? (savedDre.receitaBruta !== undefined ? savedDre.receitaBruta
+          : savedDreBase.receitaBruta !== undefined ? savedDreBase.receitaBruta
+          : receitaBrutaBase)
+      : receitaBrutaBase;
     const receitaBruta = dreScenario === 'base' ? receitaBrutaBase : receitaBrutaEdit;
 
     const percCMV           = resolveField('percCMV',           finData.config.variableCosts.cmv);
@@ -867,26 +881,33 @@ const App = () => {
     const metaLojaPercent       = goalsData.metaConservadora > 0 ? (metaLojaDiff / goalsData.metaConservadora) * 100 : 0;
 
     const computeScenario = (sc) => {
-      const keyB = `${selectedStore}-${selectedMonth}-${selectedYear}-base`;
-      const keyS = `${selectedStore}-${selectedMonth}-${selectedYear}-${sc}`;
-      const base = dreValues[keyB] || {};
-      const sv   = dreValues[keyS] || {};
-      const res  = (field, def) => sc === 'base' ? (sv[field] ?? def) : (sv[field] ?? base[field] ?? def);
-      const rb   = sc === 'base' ? totalSalesMonth : (sv.receitaBruta ?? base.receitaBruta ?? totalSalesMonth);
-      const cmvP = res('percCMV', finData.config.variableCosts.cmv);
-      const lb   = rb - rb * (cmvP / 100);
-      const ded  = rb * ((res('percImpostos', finData.config.variableCosts.imposto) + res('percTaxasCartao', finData.config.variableCosts.taxaCartao) + res('percEmbalagens', finData.config.variableCosts.embalagem) + res('percObsolescencia', finData.config.variableCosts.obsoleto)) / 100);
-      const rl   = lb - ded;
-      const df   = res('aluguel', finData.config.fixedCosts.aluguel) + res('proLabore', finData.config.fixedCosts.proLabore) + res('agua', finData.config.fixedCosts.agua) + res('luz', finData.config.fixedCosts.luz) + res('internet', finData.config.fixedCosts.internet) + res('software', finData.config.fixedCosts.software) + res('contabilidade', finData.config.fixedCosts.contabilidade) + res('salarios', finData.config.fixedCosts.colaboradoras) + res('administracao', finData.config.fixedCosts.adm) + res('alimentacao', finData.config.fixedCosts.alimentacao) + res('transporte', finData.config.fixedCosts.transporte);
-      const ro   = rl - df;
-      return { rb, lb, rl, df, ro, mg: rb > 0 ? (ro / rb) * 100 : 0 };
+      try {
+        const keyB = `${selectedStore}-${selectedMonth}-${selectedYear}-base`;
+        const keyS = `${selectedStore}-${selectedMonth}-${selectedYear}-${sc}`;
+        const base = dreValues[keyB] || {};
+        const sv   = dreValues[keyS] || {};
+        const res  = (field, def) => {
+          const v = sc === 'base' ? sv[field] : (sv[field] !== undefined ? sv[field] : base[field]);
+          return (v !== undefined && v !== null) ? v : (def || 0);
+        };
+        const rb   = sc === 'base' ? totalSalesMonth : (sv.receitaBruta !== undefined ? sv.receitaBruta : (base.receitaBruta !== undefined ? base.receitaBruta : totalSalesMonth));
+        const cmvP = res('percCMV', finData.config.variableCosts.cmv || 50);
+        const lb   = rb - rb * (cmvP / 100);
+        const ded  = rb * ((res('percImpostos', finData.config.variableCosts.imposto || 8) + res('percTaxasCartao', finData.config.variableCosts.taxaCartao || 2) + res('percEmbalagens', finData.config.variableCosts.embalagem || 0.7) + res('percObsolescencia', finData.config.variableCosts.obsoleto || 5)) / 100);
+        const rl   = lb - ded;
+        const df   = res('aluguel', finData.config.fixedCosts.aluguel || 0) + res('proLabore', finData.config.fixedCosts.proLabore || 0) + res('agua', finData.config.fixedCosts.agua || 0) + res('luz', finData.config.fixedCosts.luz || 0) + res('internet', finData.config.fixedCosts.internet || 0) + res('software', finData.config.fixedCosts.software || 0) + res('contabilidade', finData.config.fixedCosts.contabilidade || 0) + res('salarios', finData.config.fixedCosts.colaboradoras || 0) + res('administracao', finData.config.fixedCosts.adm || 0) + res('alimentacao', finData.config.fixedCosts.alimentacao || 0) + res('transporte', finData.config.fixedCosts.transporte || 0);
+        const ro   = rl - df;
+        return { rb, lb, rl, df, ro, mg: rb > 0 ? (ro / rb) * 100 : 0 };
+      } catch(e) {
+        return { rb: 0, lb: 0, rl: 0, df: 0, ro: 0, mg: 0 };
+      }
     };
     const sc = { base: computeScenario('base'), otimista: computeScenario('otimista'), pessimista: computeScenario('pessimista') };
 
     const SCENARIOS = [
-      { id: 'base',       label: '📊 Base',       color: 'emerald', description: 'Valores reais da loja' },
-      { id: 'otimista',   label: '🚀 Otimista',   color: 'blue',    description: 'Herda base, ajuste positivo' },
-      { id: 'pessimista', label: '⚠️ Pessimista', color: 'orange',  description: 'Herda base, ajuste conservador' },
+      { id: 'base',       label: '📊 Base',       activeClass: 'bg-emerald-600 text-white border-emerald-600', hoverClass: 'hover:border-emerald-300 hover:bg-emerald-50', description: 'Valores reais da loja' },
+      { id: 'otimista',   label: '🚀 Otimista',   activeClass: 'bg-blue-600 text-white border-blue-600',       hoverClass: 'hover:border-blue-300 hover:bg-blue-50',       description: 'Herda base, ajuste positivo' },
+      { id: 'pessimista', label: '⚠️ Pessimista', activeClass: 'bg-orange-500 text-white border-orange-500',   hoverClass: 'hover:border-orange-300 hover:bg-orange-50',   description: 'Herda base, ajuste conservador' },
     ];
 
     return (
@@ -899,12 +920,12 @@ const App = () => {
                <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({length:5},(_,i)=><option key={i} value={2023+i}>{2023+i}</option>)}</select>
             </div>
             <div className="flex flex-wrap gap-3">
-              {SCENARIOS.map(({ id, label, color, description }) => (
+              {SCENARIOS.map(({ id, label, activeClass, hoverClass, description }) => (
                 <button key={id} onClick={() => setDreScenario(id)}
-                  className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all text-sm font-medium ${
+                  className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all text-sm font-medium shadow-sm ${
                     dreScenario === id
-                      ? `bg-${color}-600 text-white border-${color}-600 shadow-md scale-[1.03]`
-                      : `bg-white text-gray-700 border-gray-200 hover:border-${color}-300 hover:bg-${color}-50`
+                      ? `${activeClass} shadow-md scale-[1.03]`
+                      : `bg-white text-gray-700 border-gray-200 ${hoverClass}`
                   }`}>
                   <span className="font-bold">{label}</span>
                   <span className={`text-xs mt-0.5 ${dreScenario === id ? 'opacity-80' : 'text-gray-400'}`}>{description}</span>
@@ -2306,11 +2327,24 @@ const App = () => {
             {showImportModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
-                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-blue-800"><Upload className="w-5 h-5"/> Importar Dados do Sistema</h3>
-                  <textarea className="w-full h-64 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none" value={importText} onChange={e => setImportText(e.target.value)} placeholder="MARCA..."/>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-blue-800"><Upload className="w-5 h-5"/> Importar Dados do Sistema (ERP)</h3>
+                  <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                    <label className="block text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">🏪 Loja de Destino — Dados serão isolados por loja</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(STORE_CONFIGS).map(([k, v]) => (
+                        <button key={k} onClick={() => setImportTargetStore(k)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${importTargetStore === k ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea className="w-full h-52 border border-gray-300 p-3 text-xs font-mono rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none" value={importText} onChange={e => setImportText(e.target.value)} placeholder="Cole os dados do ERP aqui (MARCA, REFERENCIA, tamanhos...)"/>
                   <div className="flex justify-end gap-2 mt-4">
                     <button onClick={() => setShowImportModal(false)} className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100">Cancelar</button>
-                    <button onClick={processImport} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-md">Processar</button>
+                    <button onClick={processImport} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-md font-bold">
+                      Importar para {STORE_CONFIGS[importTargetStore]?.name}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2354,14 +2388,18 @@ const App = () => {
         {['audit','system','diff'].includes(activeTab) && (() => {
           const storeOptions = Object.keys(STORE_CONFIGS);
 
-          // ── Zerar Estoque: copia lista do ERP com qty=0 ──────
-          const handleZerarEstoque = async () => {
-            if (!window.confirm('Isso vai zerar TODAS as contagens físicas e trazer a lista do ERP sem quantidades.\n\nIdeal para iniciar uma contagem cega. Confirmar?')) return;
-            const zeroed = systemData.map(item => {
+          // ── Zerar Estoque: copia lista do ERP da loja atual com qty=0 ──────
+          const handleZerarEstoque = () => {
+            if (!window.confirm(`Isso vai zerar as contagens físicas da ${STORE_CONFIGS[selectedStore]?.name}. Ideal para contagem cega. Confirmar?`)) return;
+            const storeItems = systemData.filter(i => (i.store_code || i.storeCode) === selectedStore);
+            const zeroed = storeItems.map(item => {
               const z = {}; sizeColumns.forEach(s => z[s] = 0);
               return { ...item, sizes: z, QTDE: 0 };
             });
-            setAuditData(zeroed);
+            setAuditData(prev => [
+              ...prev.filter(i => (i.store_code || i.storeCode) !== selectedStore),
+              ...zeroed
+            ]);
           };
 
           // ── Divergências isoladas por tamanho ────────────────
@@ -2448,10 +2486,10 @@ const App = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSystemData.length === 0 && (
+                      {filteredStoreSystemData.length === 0 && (
                         <tr><td colSpan={sizeColumns.length + 2} className="text-center py-8 text-gray-400 text-xs">Nenhum dado importado. Clique em "Importar ERP" para começar.</td></tr>
                       )}
-                      {filteredSystemData.map(item => (
+                      {filteredStoreSystemData.map(item => (
                         <tr key={item.id} className="border-b hover:bg-blue-50/30 text-xs">
                           <td className="px-4 py-2">
                             <div className="font-medium text-gray-800">{item.REFERENCIA}</div>
@@ -2508,12 +2546,12 @@ const App = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredAuditData.length === 0 && (
+                      {filteredStoreAuditData.length === 0 && (
                         <tr><td colSpan={sizeColumns.length + 2} className="text-center py-8 text-gray-400 text-xs">
                           Sem dados. Use "Zerar Estoque" para contagem cega ou "Preencher c/ Sistema" para partir do ERP.
                         </td></tr>
                       )}
-                      {filteredAuditData.map(item => (
+                      {filteredStoreAuditData.map(item => (
                         <tr key={item.id} className="border-b hover:bg-green-50/30 text-xs">
                           <td className="px-4 py-2">
                             <div className="font-medium text-gray-800">{item.REFERENCIA}</div>
@@ -3028,30 +3066,67 @@ const App = () => {
         {/* ═══════════════════ ABA RH ═══════════════════ */}
         {activeTab === 'hr' && (() => {
           const HR_STATUS = [
-            { id: 'triagem',    label: 'Triagem',    color: 'blue',   bg: 'from-blue-500 to-blue-700',   emoji: '📋' },
-            { id: 'entrevista', label: 'Entrevista', color: 'amber',  bg: 'from-amber-500 to-yellow-600', emoji: '🗣️' },
-            { id: 'contratado', label: 'Contratado', color: 'green',  bg: 'from-green-500 to-emerald-700',emoji: '✅' },
-            { id: 'reprovado',  label: 'Reprovado',  color: 'red',    bg: 'from-red-500 to-red-700',      emoji: '❌' },
+            { id: 'triagem',    label: 'Triagem',    order: 1, activeClass: 'bg-blue-600 text-white border-blue-600',   bg: 'from-blue-500 to-blue-700',    emoji: '📋' },
+            { id: 'entrevista', label: 'Entrevista', order: 2, activeClass: 'bg-amber-500 text-white border-amber-500', bg: 'from-amber-500 to-yellow-600', emoji: '🗣️' },
+            { id: 'contratado', label: 'Contratado', order: 3, activeClass: 'bg-green-600 text-white border-green-600', bg: 'from-green-500 to-emerald-700',emoji: '✅' },
+            { id: 'reprovado',  label: 'Reprovado',  order: 4, activeClass: 'bg-red-600 text-white border-red-600',     bg: 'from-red-500 to-red-700',      emoji: '❌' },
           ];
 
           const CARGO_OPTIONS = ['Vendedora', 'Gerente', 'Caixa', 'Estoquista', 'Auxiliar', 'Outro'];
-          const MOTIVO_OPTIONS = ['', 'Perfil incompatível', 'Salário acima da faixa', 'Desistiu', 'Sem experiência', 'Contratado por outra empresa', 'Sem vagas no momento', 'Outro'];
+          const FONTE_OPTIONS  = ['', 'Anúncio', 'Indicação', 'Entregue em Mãos', 'LinkedIn', 'Instagram', 'Outro'];
+          const MOTIVO_OPTIONS = ['', 'Perfil incompatível', 'Salário acima da faixa', 'Desistiu', 'Sem experiência', 'Contratado por outra empresa', 'Sem vagas', 'Outro'];
 
-          // Anos disponíveis: do ano mais antigo de candidato até ano corrente
-          const allYears = [...new Set(hrCandidates.map(c => new Date(c.recebimento_curriculo + 'T00:00:00').getFullYear()))].sort();
-          const yearOptions = allYears.length > 0
-            ? [...new Set([...allYears, new Date().getFullYear()])].sort()
-            : [new Date().getFullYear()];
+          // Anos disponíveis baseados em recebimento_curriculo
+          const allYears = [...new Set(hrCandidates.map(c => {
+            const raw = c.recebimento_curriculo || '';
+            // aceita DD/MM/YYYY e YYYY-MM-DD
+            if (raw.includes('/')) return parseInt(raw.split('/')[2]);
+            return parseInt(raw.split('-')[0]);
+          }).filter(y => y > 2000))].sort();
+          const yearOptions = [...new Set([...allYears, new Date().getFullYear()])].sort((a,b) => b - a);
 
-          // Filtros
+          const getYear = (raw) => {
+            if (!raw) return 0;
+            if (raw.includes('/')) return parseInt(raw.split('/')[2]);
+            return parseInt(raw.split('-')[0]);
+          };
+
+          const getWhatsAppLink = (phone) => {
+            const clean = String(phone || '').replace(/\D/g, '');
+            const num = clean.startsWith('55') ? clean : '55' + clean;
+            return `https://api.whatsapp.com/send?phone=${num}`;
+          };
+
+          const daysSince = (dateStr) => {
+            if (!dateStr) return null;
+            let d;
+            if (dateStr.includes('/')) {
+              const [day, mon, yr] = dateStr.split('/');
+              d = new Date(`${yr}-${mon}-${day}T00:00:00`);
+            } else {
+              d = new Date(dateStr + 'T00:00:00');
+            }
+            return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+          };
+
+          // Filtro
           const filtered = hrCandidates.filter(c => {
-            const cYear = new Date(c.recebimento_curriculo + 'T00:00:00').getFullYear();
-            if (hrFilterYear !== 'all' && cYear !== hrFilterYear) return false;
+            const cYear = getYear(c.recebimento_curriculo);
+            if (hrFilterYear !== 'all' && cYear !== Number(hrFilterYear)) return false;
             if (hrFilterStore !== 'all' && c.loja !== hrFilterStore) return false;
             if (hrFilterStatus !== 'all' && c.status !== hrFilterStatus) return false;
-            if (hrSearch && !c.nome.toLowerCase().includes(hrSearch.toLowerCase()) && !c.cargo.toLowerCase().includes(hrSearch.toLowerCase())) return false;
+            if (hrSearch && !c.nome.toLowerCase().includes(hrSearch.toLowerCase()) &&
+                !(c.cargo || '').toLowerCase().includes(hrSearch.toLowerCase()) &&
+                !(c.observacoes || '').toLowerCase().includes(hrSearch.toLowerCase())) return false;
             return true;
           });
+
+          // Stats e funil
+          const stats      = HR_STATUS.map(s => ({ ...s, count: filtered.filter(c => c.status === s.id).length }));
+          const total       = filtered.length;
+          const slaAlerts   = filtered.filter(c => c.status === 'triagem' && daysSince(c.recebimento_curriculo) > 5).length;
+          const hired       = filtered.filter(c => c.status === 'contratado').length;
+          const convRate    = total > 0 ? ((hired / total) * 100).toFixed(1) : '0.0';
 
           const openForm = (candidate = null) => {
             if (candidate) {
@@ -3060,9 +3135,9 @@ const App = () => {
             } else {
               setHrEditId(null);
               setHrForm({
-                nome: '', telefone: '', cargo: '', loja: selectedStore || '10',
-                status: 'triagem', motivo: '',
-                recebimento_curriculo: new Date().toISOString().slice(0,10),
+                nome: '', telefone: '', cargo: 'Vendedora', loja: selectedStore || '10',
+                status: 'triagem', fonte: '', motivo: '',
+                recebimento_curriculo: new Date().toISOString().slice(0, 10),
                 entrevista_data: '', contratacao_data: '', observacoes: ''
               });
             }
@@ -3074,8 +3149,7 @@ const App = () => {
             if (hrEditId) {
               setHrCandidates(prev => prev.map(c => c.id === hrEditId ? { ...hrForm, id: hrEditId } : c));
             } else {
-              const newId = Date.now();
-              setHrCandidates(prev => [...prev, { ...hrForm, id: newId }]);
+              setHrCandidates(prev => [...prev, { ...hrForm, id: Date.now() }]);
             }
             setHrShowForm(false);
             setHrEditId(null);
@@ -3095,46 +3169,39 @@ const App = () => {
             }));
           };
 
-          const daysSince = (dateStr) => {
-            if (!dateStr) return null;
-            const diff = (Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24);
-            return Math.floor(diff);
-          };
-
-          // Stats
-          const stats = HR_STATUS.map(s => ({ ...s, count: filtered.filter(c => c.status === s.id).length }));
-
           return (
             <div className="space-y-6">
-              {/* Header */}
+
+              {/* HEADER */}
               <div className="bg-gradient-to-br from-white to-teal-50/30 p-6 rounded-2xl border border-teal-100 shadow-lg">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                  <h2 className="text-2xl font-bold text-teal-800 flex items-center gap-2"><UserCheck className="w-6 h-6"/> RH — Candidatos</h2>
+                  <h2 className="text-2xl font-bold text-teal-800 flex items-center gap-2"><UserCheck className="w-6 h-6"/> RH — Recrutamento</h2>
                   <button onClick={() => openForm()}
-                    className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition-all font-medium">
+                    className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md font-medium transition-all">
                     <PlusCircle className="w-4 h-4"/> Novo Candidato
                   </button>
                 </div>
 
                 {/* FILTROS */}
-                <div className="flex flex-wrap gap-3">
-                  {/* Ano */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-teal-700 uppercase">Ano:</span>
+                <div className="flex flex-wrap gap-4">
+                  {/* ANO — Leads aquecidos */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-teal-700 uppercase tracking-wide">Ano:</span>
                     <button onClick={() => setHrFilterYear('all')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterYear === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
-                      Todos
+                      Histórico
                     </button>
                     {yearOptions.map(y => (
                       <button key={y} onClick={() => setHrFilterYear(y)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterYear === y ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
-                        {y}
+                        {y} {y === new Date().getFullYear() ? '🔥' : ''}
                       </button>
                     ))}
                   </div>
-                  {/* Loja */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-teal-700 uppercase">Loja:</span>
+
+                  {/* LOJA */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-teal-700 uppercase tracking-wide">Loja:</span>
                     <button onClick={() => setHrFilterStore('all')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStore === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
                       Todas
@@ -3146,84 +3213,135 @@ const App = () => {
                       </button>
                     ))}
                   </div>
-                  {/* Status */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-teal-700 uppercase">Status:</span>
+
+                  {/* STATUS */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-teal-700 uppercase tracking-wide">Status:</span>
                     <button onClick={() => setHrFilterStatus('all')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStatus === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300'}`}>
                       Todos
                     </button>
                     {HR_STATUS.map(s => (
                       <button key={s.id} onClick={() => setHrFilterStatus(hrFilterStatus === s.id ? 'all' : s.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStatus === s.id ? `bg-${s.color}-600 text-white border-${s.color}-600 shadow-sm` : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${hrFilterStatus === s.id ? s.activeClass : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
                         {s.emoji} {s.label}
                       </button>
                     ))}
                   </div>
-                  {/* Busca */}
+
+                  {/* BUSCA */}
                   <div className="relative ml-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"/>
                     <input value={hrSearch} onChange={e => setHrSearch(e.target.value)}
-                      placeholder="Buscar nome ou cargo..."
+                      placeholder="Nome, cargo, obs..."
                       className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-400 focus:outline-none w-48"/>
                   </div>
                 </div>
+              </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-4 gap-3 mt-5">
-                  {stats.map(s => (
-                    <div key={s.id} className={`bg-gradient-to-br ${s.bg} text-white p-3 rounded-xl shadow-sm`}>
-                      <div className="text-xs opacity-80 font-medium">{s.emoji} {s.label}</div>
-                      <div className="text-2xl font-bold mt-0.5">{s.count}</div>
-                    </div>
-                  ))}
+              {/* KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-4 rounded-2xl shadow-md">
+                  <div className="text-xs opacity-80 font-bold uppercase">Total Leads</div>
+                  <div className="text-3xl font-black mt-1">{total}</div>
+                  <div className="text-xs opacity-70 mt-1">{hrFilterYear === 'all' ? 'Histórico completo' : `Curríc. ${hrFilterYear}`}</div>
+                </div>
+                <div className={`bg-gradient-to-br ${slaAlerts > 0 ? 'from-red-500 to-red-700' : 'from-gray-400 to-gray-600'} text-white p-4 rounded-2xl shadow-md`}>
+                  <div className="text-xs opacity-80 font-bold uppercase">⚠️ Alertas SLA</div>
+                  <div className="text-3xl font-black mt-1">{slaAlerts}</div>
+                  <div className="text-xs opacity-70 mt-1">Triagem há +5 dias</div>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-700 text-white p-4 rounded-2xl shadow-md">
+                  <div className="text-xs opacity-80 font-bold uppercase">✅ Contratados</div>
+                  <div className="text-3xl font-black mt-1">{hired}</div>
+                  <div className="text-xs opacity-70 mt-1">Conversão: {convRate}%</div>
+                </div>
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-700 text-white p-4 rounded-2xl shadow-md">
+                  <div className="text-xs opacity-80 font-bold uppercase">Em Processo</div>
+                  <div className="text-3xl font-black mt-1">{filtered.filter(c => c.status === 'triagem' || c.status === 'entrevista').length}</div>
+                  <div className="text-xs opacity-70 mt-1">Triagem + Entrevista</div>
+                </div>
+              </div>
+
+              {/* FUNIL DE CONVERSÃO */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-teal-600"/> Funil de Conversão</h3>
+                <div className="space-y-2">
+                  {HR_STATUS.map(s => {
+                    const count = filtered.filter(c => c.status === s.id).length;
+                    const pct = total > 0 ? (count / total) * 100 : 0;
+                    const barColors = {
+                      triagem: 'bg-blue-500', entrevista: 'bg-amber-500',
+                      contratado: 'bg-green-500', reprovado: 'bg-red-500'
+                    };
+                    return (
+                      <div key={s.id} className="flex items-center gap-3">
+                        <div className="w-24 text-xs font-bold text-gray-600 text-right shrink-0">{s.emoji} {s.label}</div>
+                        <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden relative">
+                          <div className={`h-6 rounded-full transition-all ${barColors[s.id]}`} style={{width: `${pct}%`, minWidth: count > 0 ? 32 : 0}}/>
+                          {count > 0 && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white">{count}</span>}
+                        </div>
+                        <div className="w-12 text-xs font-mono text-gray-500 shrink-0">{pct.toFixed(0)}%</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* KANBAN */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {HR_STATUS.map(col => {
-                  const colCandidates = filtered.filter(c => c.status === col.id).sort((a,b) => new Date(b.recebimento_curriculo) - new Date(a.recebimento_curriculo));
+                  const colCandidates = filtered.filter(c => c.status === col.id)
+                    .sort((a,b) => new Date(b.recebimento_curriculo) - new Date(a.recebimento_curriculo));
                   return (
-                    <div key={col.id} className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className={`bg-gradient-to-r ${col.bg} text-white px-4 py-3 flex items-center justify-between`}>
+                    <div key={col.id} className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
+                      <div className={`bg-gradient-to-r ${col.bg} text-white px-4 py-3 flex items-center justify-between shrink-0`}>
                         <span className="font-bold text-sm">{col.emoji} {col.label}</span>
-                        <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full">{colCandidates.length}</span>
+                        <span className="bg-white/25 text-xs font-bold px-2 py-0.5 rounded-full">{colCandidates.length}</span>
                       </div>
-                      <div className="p-3 space-y-3 min-h-32">
+                      <div className="p-3 space-y-3 overflow-y-auto" style={{maxHeight: 480}}>
                         {colCandidates.length === 0 && (
-                          <div className="text-center py-6 text-gray-300 text-xs">Nenhum candidato</div>
+                          <div className="text-center py-8 text-gray-300 text-xs">Nenhum candidato</div>
                         )}
                         {colCandidates.map(c => {
                           const dias = daysSince(c.recebimento_curriculo);
                           const slaAlert = col.id === 'triagem' && dias > 5;
+                          const phoneClean = String(c.telefone || '').replace(/\D/g, '');
                           return (
-                            <div key={c.id} className={`bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition-all ${slaAlert ? 'border-red-300' : 'border-gray-100'}`}>
-                              <div className="flex items-start justify-between gap-1 mb-1.5">
+                            <div key={c.id} className={`bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition-all ${slaAlert ? 'border-red-400 ring-1 ring-red-300' : 'border-gray-100'}`}>
+                              <div className="flex items-start justify-between gap-1 mb-2">
                                 <div className="flex-1 min-w-0">
                                   <div className="font-bold text-sm text-gray-900 truncate">{c.nome}</div>
-                                  <div className="text-xs text-gray-500">{c.cargo} · {STORE_CONFIGS[c.loja]?.name || c.loja}</div>
+                                  <div className="text-xs text-gray-500">{c.cargo || '—'} · {STORE_CONFIGS[c.loja]?.name || c.loja}</div>
+                                  {c.fonte && <div className="text-xs text-indigo-500 font-medium">{c.fonte}</div>}
                                 </div>
                                 <button onClick={() => openForm(c)} className="text-gray-300 hover:text-teal-600 shrink-0 transition-colors p-0.5">
-                                  <Search className="w-3.5 h-3.5"/>
+                                  <SlidersHorizontal className="w-3.5 h-3.5"/>
                                 </button>
                               </div>
-                              {/* SLA tag */}
+                              {/* SLA */}
                               {dias !== null && (
-                                <div className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mb-2 ${slaAlert ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100 text-gray-500'}`}>
+                                <div className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mb-2 ${slaAlert ? 'bg-red-100 text-red-700 font-bold border border-red-300' : 'bg-gray-100 text-gray-500'}`}>
                                   <Calendar className="w-3 h-3"/> {dias}d {slaAlert ? '⚠️ SLA' : ''}
                                 </div>
                               )}
                               {c.observacoes && <div className="text-xs text-gray-400 italic truncate mb-2">{c.observacoes}</div>}
-                              {/* Mover para próximo status */}
-                              <div className="flex gap-1 flex-wrap">
+                              {/* WhatsApp */}
+                              {phoneClean.length >= 8 && (
+                                <a href={getWhatsAppLink(phoneClean)} target="_blank" rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold mb-2 transition-all shadow-sm">
+                                  <Send className="w-3 h-3"/> WhatsApp
+                                </a>
+                              )}
+                              {/* Mover status */}
+                              <div className="flex gap-1 flex-wrap mt-1">
                                 {HR_STATUS.filter(s => s.id !== col.id).map(s => (
                                   <button key={s.id} onClick={() => moveStatus(c.id, s.id)}
                                     className="text-xs px-2 py-0.5 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700 transition-all">
                                     → {s.label}
                                   </button>
                                 ))}
-                                <button onClick={() => deleteCandidate(c.id)} className="text-xs px-2 py-0.5 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 transition-all ml-auto">
+                                <button onClick={() => deleteCandidate(c.id)} className="text-xs px-1.5 py-0.5 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 transition-all ml-auto">
                                   <Trash2 className="w-3 h-3"/>
                                 </button>
                               </div>
@@ -3242,7 +3360,7 @@ const App = () => {
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                     <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
                       <h3 className="font-bold text-lg">{hrEditId ? 'Editar Candidato' : 'Novo Candidato'}</h3>
-                      <button onClick={() => setHrShowForm(false)} className="text-white/70 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
+                      <button onClick={() => setHrShowForm(false)} className="text-white/70 hover:text-white"><X className="w-5 h-5"/></button>
                     </div>
                     <div className="p-6 space-y-4">
                       <div className="grid grid-cols-2 gap-4">
@@ -3255,6 +3373,19 @@ const App = () => {
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Telefone</label>
                           <input value={hrForm.telefone} onChange={e => setHrForm(p => ({...p, telefone: e.target.value}))}
                             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none" placeholder="(11) 9xxxx-xxxx"/>
+                          {hrForm.telefone && String(hrForm.telefone).replace(/\D/g,'').length >= 8 && (
+                            <a href={getWhatsAppLink(hrForm.telefone)} target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-1 mt-1 text-xs text-green-600 hover:text-green-700 font-medium">
+                              <Send className="w-3 h-3"/> Abrir WhatsApp
+                            </a>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Fonte</label>
+                          <select value={hrForm.fonte || ''} onChange={e => setHrForm(p => ({...p, fonte: e.target.value}))}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
+                            {FONTE_OPTIONS.map(f => <option key={f} value={f}>{f || 'Selecione...'}</option>)}
+                          </select>
                         </div>
                         <div>
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Cargo</label>
@@ -3285,18 +3416,18 @@ const App = () => {
                         </div>
                         <div>
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Data Entrevista</label>
-                          <input type="date" value={hrForm.entrevista_data} onChange={e => setHrForm(p => ({...p, entrevista_data: e.target.value}))}
+                          <input type="date" value={hrForm.entrevista_data || ''} onChange={e => setHrForm(p => ({...p, entrevista_data: e.target.value}))}
                             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none"/>
                         </div>
                         <div>
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Data Contratação</label>
-                          <input type="date" value={hrForm.contratacao_data} onChange={e => setHrForm(p => ({...p, contratacao_data: e.target.value}))}
+                          <input type="date" value={hrForm.contratacao_data || ''} onChange={e => setHrForm(p => ({...p, contratacao_data: e.target.value}))}
                             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none"/>
                         </div>
-                        {(hrForm.status === 'reprovado') && (
+                        {hrForm.status === 'reprovado' && (
                           <div className="col-span-2">
                             <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Motivo da Reprovação</label>
-                            <select value={hrForm.motivo} onChange={e => setHrForm(p => ({...p, motivo: e.target.value}))}
+                            <select value={hrForm.motivo || ''} onChange={e => setHrForm(p => ({...p, motivo: e.target.value}))}
                               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none">
                               {MOTIVO_OPTIONS.map(m => <option key={m} value={m}>{m || 'Selecione...'}</option>)}
                             </select>
@@ -3304,7 +3435,7 @@ const App = () => {
                         )}
                         <div className="col-span-2">
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Observações</label>
-                          <textarea value={hrForm.observacoes} onChange={e => setHrForm(p => ({...p, observacoes: e.target.value}))}
+                          <textarea value={hrForm.observacoes || ''} onChange={e => setHrForm(p => ({...p, observacoes: e.target.value}))}
                             rows={3} className="w-full border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-teal-400 focus:outline-none resize-none" placeholder="Anotações livres..."/>
                         </div>
                       </div>
