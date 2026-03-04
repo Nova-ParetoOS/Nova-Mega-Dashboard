@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabase';
 import { useSupabaseData } from './useSupabase';
 import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
-
 // ==========================================
 // 1. CONFIGURAÇÕES FINANCEIRA DAS LOJAS
 // ==========================================
@@ -307,45 +306,54 @@ const App = () => {
   const [importTargetStore, setImportTargetStore] = useState('10');
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
   
-  // --- Estados Persistentes ---
-  const [systemData, setSystemData] = useState(() => {
-     try { return JSON.parse(localStorage.getItem('stock_systemData')) || initialMockData; } catch { return initialMockData; }
-  });
-  const [auditData, setAuditData] = useState(() => {
-     try {
-       const saved = localStorage.getItem('stock_auditData');
-       if (saved) return JSON.parse(saved);
-       return initialMockData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: 0 }));
-     } catch { return []; }
-  });
-  const [completedIds, setCompletedIds] = useState(() => {
-     try { return new Set(JSON.parse(localStorage.getItem('stock_completedIds'))); } catch { return new Set(); }
-  });
-  const [marketingStatus, setMarketingStatus] = useState(() => {
-     try { return JSON.parse(localStorage.getItem('stock_marketingStatus')) || {}; } catch { return {}; }
-  });
-  const [salesHistory, setSalesHistory] = useState(() => {
-     try { return JSON.parse(localStorage.getItem('stock_salesHistory')) || []; } catch { return []; }
-  });
-  const [sellerOverrides, setSellerOverrides] = useState(() => {
-      try { return JSON.parse(localStorage.getItem('stock_sellerOverrides')) || {}; } catch { return {}; }
-  });
-  const [projectionSellers, setProjectionSellers] = useState(() => {
-     try { return JSON.parse(localStorage.getItem('stock_projectionSellers')) || {}; } catch { return {}; }
-  });
-  const [dreValues, setDreValues] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stock_dreValues')) || {}; } catch { return {}; }
-  });
-  const [dreScenario, setDreScenario] = useState('base'); // 'base' | 'otimista' | 'pessimista'
-  // Goals tab: manual seller count override for quick scenario testing
+
+  // --- Auth ---
+  const [userId, setUserId] = useState(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // --- Dados Persistentes via Supabase ---
+  const {
+    loading: dbLoading,
+    syncStatus,
+    systemData,
+    auditData,
+    salesHistory,
+    dreValues,
+    projectionSellers,
+    marketingStatus,
+    completedIds,
+    sellerOverrides,
+    hrCandidates,
+    setSystemData:          _setSystemData,
+    setAuditData:           _seedAudit,
+    updateAuditItem:        _updateAuditItem,
+    upsertSalesHistory,
+    updateDreKey,
+    deleteDreKey,
+    toggleMarketing:        _toggleMarketing,
+    toggleCompleted:        _toggleCompleted,
+    setSellerOverride:      _setSellerOverride,
+    saveHrCandidate:        _saveHrCandidate,
+    deleteHrCandidate:      _deleteHrCandidate,
+    moveHrStatus:           _moveHrStatus,
+    updateProjectionSeller: _updateProjectionSeller,
+    reloadAll,
+  } = useSupabaseData(userId);
+
+  // --- UI State (não persistido) ---
+  const [dreScenario, setDreScenario] = useState('base');
   const [goalsSellerOverride, setGoalsSellerOverride] = useState(null);
-  // Goals tab: selected seller names for chip-based count
   const [selectedSellerNames, setSelectedSellerNames] = useState(new Set());
 
   // --- RH State ---
-  const [hrCandidates, setHrCandidates] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stock_hrCandidates')) || []; } catch { return []; }
-  });
   const [hrFilterYear, setHrFilterYear] = useState(new Date().getFullYear());
   const [hrFilterStore, setHrFilterStore] = useState('all');
   const [hrFilterStatus, setHrFilterStatus] = useState('all');
@@ -358,36 +366,6 @@ const App = () => {
     recebimento_curriculo: new Date().toISOString().slice(0,10),
     entrevista_data: '', contratacao_data: '', observacoes: ''
   });
-
-  // --- Efeitos de Salvamento ---
-  useEffect(() => { localStorage.setItem('stock_systemData', JSON.stringify(systemData)); }, [systemData]);
-  useEffect(() => { localStorage.setItem('stock_auditData', JSON.stringify(auditData)); }, [auditData]);
-  useEffect(() => { localStorage.setItem('stock_completedIds', JSON.stringify([...completedIds])); }, [completedIds]);
-  useEffect(() => { localStorage.setItem('stock_marketingStatus', JSON.stringify(marketingStatus)); }, [marketingStatus]);
-  useEffect(() => { localStorage.setItem('stock_salesHistory', JSON.stringify(salesHistory)); }, [salesHistory]);
-  useEffect(() => { localStorage.setItem('stock_sellerOverrides', JSON.stringify(sellerOverrides)); }, [sellerOverrides]);
-  useEffect(() => { localStorage.setItem('stock_projectionSellers', JSON.stringify(projectionSellers)); }, [projectionSellers]);
-  useEffect(() => { localStorage.setItem('stock_dreValues', JSON.stringify(dreValues)); }, [dreValues]);
-  useEffect(() => { localStorage.setItem('stock_hrCandidates', JSON.stringify(hrCandidates)); }, [hrCandidates]);
-
-  useEffect(() => {
-    if (auditData.length === 0 && systemData.length > 0) {
-      const initialAudit = systemData.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: 0 }));
-      setAuditData(initialAudit);
-    }
-  }, [systemData.length]);
-
-  // Limpar dados de meses futuros
-  useEffect(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    const cleanedHistory = salesHistory.filter(h => {
-      const [year, month] = h.period.split('-').map(Number);
-      return year < currentYear || (year === currentYear && month <= currentMonth);
-    });
-    if (cleanedHistory.length !== salesHistory.length) setSalesHistory(cleanedHistory);
-  }, []);
 
   // --- Lógica de Negócio ---
   const filterData = useCallback((data) => {
@@ -408,10 +386,11 @@ const App = () => {
       return 'extra';
   };
 
+
   const toggleSellerStatus = (storeId, month, year, sellerName, currentStatus) => {
       const key = `${storeId}-${month}-${year}-${sellerName}`;
       const newStatus = currentStatus === 'active' ? 'extra' : 'active';
-      setSellerOverrides(prev => ({ ...prev, [key]: newStatus }));
+      _setSellerOverride(key, newStatus);
   };
 
   const getHistoricalDataForStorePeriod = (storeId, month, year) => {
@@ -602,8 +581,8 @@ const App = () => {
     }).filter(i => i && i.hasDifference);
   }, [systemData, auditData]);
 
-  const exits = differences.filter(d => d.diffTotal < 0 && !completedIds.has(d.id));
-  const entries = differences.filter(d => d.diffTotal > 0 && !completedIds.has(d.id));
+  const exits = differences.filter(d => d.diffTotal < 0 && !(completedIds.has(`${d.store_code || selectedStore}|${d.id}`) || completedIds.has(String(d.id))));
+  const entries = differences.filter(d => d.diffTotal > 0 && !(completedIds.has(`${d.store_code || selectedStore}|${d.id}`) || completedIds.has(String(d.id))));
 
   // Dados de auditoria filtrados pela loja selecionada no dashboard
   const dashboardAuditData = useMemo(() => {
@@ -667,30 +646,65 @@ const App = () => {
   const heavyStockToDisplay = printMode ? dashboardStats.heavyStock : dashboardStats.heavyStock.slice(0, 20);
 
   // --- Handlers ---
-  const handleAuditChange = useCallback((id, size, value) => {
-    const newValue = value === "" ? "" : parseInt(value);
-    setAuditData(prev => prev.map(item => item.id === id ? { ...item, sizes: { ...item.sizes, [size]: newValue }, QTDE: calculateTotal({ ...item.sizes, [size]: newValue }) } : item));
-  }, []);
 
-  const confirmFillAuditWithSystem = () => {
-    // Preencher auditoria apenas com os itens da loja selecionada, mantendo outras lojas
+  // --- Handlers ---
+  const handleAuditChange = useCallback((id, size, value) => {
+    const newValue = value === "" ? 0 : parseInt(value) || 0;
+    const item = auditData.find(i => i.id === id && (i.store_code || i.storeCode) === selectedStore);
+    if (!item) return;
+    const newSizes = { ...item.sizes, [size]: newValue };
+    _updateAuditItem(selectedStore, id, item.REFERENCIA, newSizes);
+  }, [auditData, selectedStore, _updateAuditItem]);
+
+  const confirmFillAuditWithSystem = async () => {
     const storeItems = systemData.filter(i => (i.store_code || i.storeCode) === selectedStore);
-    setAuditData(prev => [
-      ...prev.filter(i => (i.store_code || i.storeCode) !== selectedStore),
-      ...storeItems.map(item => ({ ...item, sizes: { ...item.sizes }, QTDE: calculateTotal(item.sizes) }))
-    ]);
+    await _seedAudit(selectedStore, storeItems.map(item => ({
+      ...item,
+      sizes: { ...item.sizes },
+      QTDE: calculateTotal(item.sizes)
+    })));
     setShowResetModal(false);
   };
-  const toggleCompleted = (splitId) => { const newSet = new Set(completedIds); newSet.has(splitId) ? newSet.delete(splitId) : newSet.add(splitId); setCompletedIds(newSet); };
+
+  // toggleCompleted: aceita "storeCode|itemId" ou itemId numérico (legado)
+  const toggleCompleted = (splitIdOrId) => {
+    if (typeof splitIdOrId === 'string' && splitIdOrId.includes('|')) {
+      const [storeCode, itemId] = splitIdOrId.split('|');
+      _toggleCompleted(storeCode, Number(itemId));
+    } else {
+      _toggleCompleted(selectedStore, Number(splitIdOrId));
+    }
+  };
+
+  const isCompleted = (itemId, storeCode) => {
+    const sc = storeCode || selectedStore;
+    return completedIds.has(`${sc}|${itemId}`) || completedIds.has(String(itemId));
+  };
+
   const toggleCategory = (category) => { const newSet = new Set(expandedCategories); newSet.has(category) ? newSet.delete(category) : newSet.add(category); setExpandedCategories(newSet); };
-  const toggleMarketing = (key, field) => { setMarketingStatus(prev => ({...prev, [key]: { ...prev[key], [field]: !prev[key]?.[field] }})); };
-  
-  const processImport = () => {
+
+  // toggleMarketing: key pode ser "REFERENCIA-COR" (legado) ou já um itemKey
+  const toggleMarketing = (key, field) => {
+    const storeCode = selectedStore;
+    const compositeKey = `${storeCode}|${key}`;
+    const current = marketingStatus[compositeKey] || marketingStatus[key] || {};
+    _toggleMarketing(storeCode, key, field, current[field]);
+  };
+
+  // Helper: lê mktStatus usando chave composta store|key
+  const getMktStatus = (item) => {
+    const key = getItemKey(item);
+    const storeCode = item.store_code || item.storeCode || selectedStore;
+    return marketingStatus[`${storeCode}|${key}`] || marketingStatus[key] || {};
+  };
+
+  const processImport = async () => {
       try {
         const rows = importText.trim().split('\n'); if (rows.length < 2) return;
-        const headers = rows[0].split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ',')).map(h => h.trim().toUpperCase());
+        const sep = rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ',');
+        const headers = rows[0].split(sep).map(h => h.trim().toUpperCase());
         const parsed = rows.slice(1).map((row, idx) => {
-            const vals = row.split(rows[0].includes('\t') ? '\t' : (rows[0].includes(';') ? ';' : ','));
+            const vals = row.split(sep);
             const item = { id: idx + 1, sizes: {}, store_code: importTargetStore };
             headers.forEach((h, i) => { if (sizeColumns.includes(h)) item.sizes[h] = parseInt(vals[i]) || 0; else item[h] = vals[i]; });
             sizeColumns.forEach(s => { if (item.sizes[s] === undefined) item.sizes[s] = 0; });
@@ -698,14 +712,13 @@ const App = () => {
             item.REFERENCIA = item.REFERENCIA || `ITEM-${idx}`; item.MARCADESC = item.MARCADESC || "GENERICO"; item.TIPODESC = item.TIPODESC || "OUTROS";
             return item;
         });
-        // Manter dados das outras lojas, substituir apenas a loja importada
-        setSystemData(prev => [...prev.filter(i => (i.store_code || i.storeCode) !== importTargetStore), ...parsed]);
-        setAuditData(prev => [...prev.filter(i => (i.store_code || i.storeCode) !== importTargetStore), ...parsed.map(i => { const z = {}; sizeColumns.forEach(s => z[s] = 0); return {...i, sizes: z, QTDE: 0}; })]);
-        setCompletedIds(new Set()); setShowImportModal(false); setImportText(""); alert(`Importado para ${STORE_CONFIGS[importTargetStore]?.name || importTargetStore}!`);
-      } catch { alert("Erro importação"); }
+        await _setSystemData(importTargetStore, parsed);
+        setShowImportModal(false); setImportText("");
+        alert(`Importado para ${STORE_CONFIGS[importTargetStore]?.name || importTargetStore}!`);
+      } catch(e) { console.error(e); alert("Erro importação"); }
   };
 
-  const processSalesHistoryImport = () => {
+  const processSalesHistoryImport = async () => {
     const now = new Date();
     if (selectedYear > now.getFullYear() || (selectedYear === now.getFullYear() && selectedMonth > now.getMonth() + 1)) {
         alert("Não é possível importar dados de meses futuros."); return;
@@ -728,18 +741,17 @@ const App = () => {
           period: `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
         };
       }).filter(Boolean);
-      let cleaned = salesHistory;
-      if (clearBeforeImport) {
-        cleaned = salesHistory.filter(h => !(h.period === `${selectedYear}-${String(selectedMonth).padStart(2, '0')}` && h.storeCode === importTargetStore));
-      } else {
-        cleaned = salesHistory.filter(h => !newEntries.some(n => n.period === h.period && n.sellerName === h.sellerName && n.storeCode === h.storeCode));
-      }
-      setSalesHistory([...cleaned, ...newEntries]); 
-      setShowHistoryImportModal(false); 
-      setHistoryImportText(""); 
+      const period = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      await upsertSalesHistory(
+        newEntries,
+        clearBeforeImport ? importTargetStore : null,
+        clearBeforeImport ? period : null
+      );
+      setShowHistoryImportModal(false);
+      setHistoryImportText("");
       setClearBeforeImport(false);
       alert("Histórico Importado com Sucesso!");
-    } catch { alert("Erro importação histórico"); }
+    } catch(e) { console.error(e); alert("Erro importação histórico"); }
   };
 
   const handleExport = () => {
@@ -763,7 +775,8 @@ const App = () => {
         (item.TIPODESC || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.MARCADESC || "").toLowerCase().includes(searchTerm.toLowerCase());
       const key = getItemKey(item);
-      const mStatus = marketingStatus[key] || {};
+      const storeCode = item.store_code || item.storeCode || 'all';
+      const mStatus = marketingStatus[`${storeCode}|${key}`] || marketingStatus[key] || {};
       if (marketingSort === 'archived') return !!mStatus.discontinued && matchesSearch;
       if (mStatus.discontinued) return false; // ocultar arquivados nas outras views
       if (marketingSort === 'cleanup') return stock === 0 && mStatus.catalog && matchesSearch;
@@ -835,9 +848,11 @@ const App = () => {
       return savedDre[field] ?? savedDreBase[field] ?? configDefault;
     };
 
+
     const updateDreValue = (field, value) => {
-      setDreValues(prev => ({ ...prev, [dreKey]: { ...prev[dreKey], [field]: parseFloat(value) || 0 } }));
+      updateDreKey(dreKey, field, value);
     };
+
 
     const receitaBrutaBase = totalSalesMonth;
     // Para cenários otimista/pessimista: se não há valor salvo, herda base (ou 0 explícito se base também for 0)
@@ -934,7 +949,7 @@ const App = () => {
                 </button>
               ))}
               {dreScenario !== 'base' && (
-                <button onClick={() => { if (window.confirm('Limpar alterações deste cenário?')) setDreValues(prev => { const n = {...prev}; delete n[dreKey]; return n; }); }}
+                <button onClick={() => { if (window.confirm('Limpar alterações deste cenário?')) deleteDreKey(dreKey); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-sm hover:bg-red-50 transition-all self-center">
                   <X className="w-4 h-4"/> Resetar cenário
                 </button>
@@ -2289,7 +2304,6 @@ const App = () => {
         </div>
     );
   };
-
   return (
     <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-slate-800 font-sans pb-20 ${printMode ? 'bg-white' : ''}`}>
       <style>{`@media print { @page { margin: 1.5cm; size: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; } .no-print { display: none !important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
@@ -2391,17 +2405,14 @@ const App = () => {
           const storeOptions = Object.keys(STORE_CONFIGS);
 
           // ── Zerar Estoque: copia lista do ERP da loja atual com qty=0 ──────
-          const handleZerarEstoque = () => {
+          const handleZerarEstoque = async () => {
             if (!window.confirm(`Isso vai zerar as contagens físicas da ${STORE_CONFIGS[selectedStore]?.name}. Ideal para contagem cega. Confirmar?`)) return;
             const storeItems = systemData.filter(i => (i.store_code || i.storeCode) === selectedStore);
             const zeroed = storeItems.map(item => {
               const z = {}; sizeColumns.forEach(s => z[s] = 0);
               return { ...item, sizes: z, QTDE: 0 };
             });
-            setAuditData(prev => [
-              ...prev.filter(i => (i.store_code || i.storeCode) !== selectedStore),
-              ...zeroed
-            ]);
+            await _seedAudit(selectedStore, zeroed);
           };
 
           // ── Divergências isoladas por tamanho ────────────────
@@ -2425,8 +2436,8 @@ const App = () => {
             return { ...sys, baixasSizes, entradasSizes, hasBaixa, hasEntrada };
           }).filter(Boolean);
 
-          const exitItems  = divergences.filter(d => d.hasBaixa   && !completedIds.has(d.id));
-          const entryItems = divergences.filter(d => d.hasEntrada && !completedIds.has(d.id));
+          const exitItems  = divergences.filter(d => d.hasBaixa   && !isCompleted(d.id, selectedStore));
+          const entryItems = divergences.filter(d => d.hasEntrada && !isCompleted(d.id, selectedStore));
 
           return (
             <div className="space-y-5">
@@ -3014,7 +3025,7 @@ const App = () => {
                           </div>
                         ) : marketingItems.map(item => {
                           const key = getItemKey(item);
-                          const mStatus = marketingStatus[key] || {};
+                          const mStatus = getMktStatus(item);
                           const isArchived = marketingSort === 'archived';
                           const stockTotal = calculateTotal(item.sizes);
                           return (
@@ -3146,29 +3157,24 @@ const App = () => {
             setHrShowForm(true);
           };
 
-          const saveCandidate = () => {
+          const saveCandidate = async () => {
             if (!hrForm.nome.trim()) return;
-            if (hrEditId) {
-              setHrCandidates(prev => prev.map(c => c.id === hrEditId ? { ...hrForm, id: hrEditId } : c));
-            } else {
-              setHrCandidates(prev => [...prev, { ...hrForm, id: Date.now() }]);
-            }
-            setHrShowForm(false);
-            setHrEditId(null);
+            const ok = await _saveHrCandidate(hrForm, hrEditId);
+            if (ok) { setHrShowForm(false); setHrEditId(null); }
           };
 
-          const deleteCandidate = (id) => {
-            if (window.confirm('Remover candidato?')) setHrCandidates(prev => prev.filter(c => c.id !== id));
+          const deleteCandidate = async (id) => {
+            if (window.confirm('Remover candidato?')) await _deleteHrCandidate(id);
           };
 
-          const moveStatus = (id, newStatus) => {
-            setHrCandidates(prev => prev.map(c => {
-              if (c.id !== id) return c;
-              const updated = { ...c, status: newStatus };
-              if (newStatus === 'entrevista' && !updated.entrevista_data) updated.entrevista_data = new Date().toISOString().slice(0,10);
-              if (newStatus === 'contratado' && !updated.contratacao_data) updated.contratacao_data = new Date().toISOString().slice(0,10);
-              return updated;
-            }));
+          const moveStatus = async (id, newStatus) => {
+            const extraFields = {};
+            const candidate = hrCandidates.find(c => c.id === id);
+            if (newStatus === 'entrevista' && candidate && !candidate.entrevista_data)
+              extraFields.entrevista_data = new Date().toISOString().slice(0,10);
+            if (newStatus === 'contratado' && candidate && !candidate.contratacao_data)
+              extraFields.contratacao_data = new Date().toISOString().slice(0,10);
+            await _moveHrStatus(id, newStatus, extraFields);
           };
 
           return (
