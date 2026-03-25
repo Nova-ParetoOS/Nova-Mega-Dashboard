@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StatsCard } from './ui/stats-card';
 import { Package, Users, Bookmark, DollarSign, Activity } from 'lucide-react';
 
-const formatCurrency = (value) => 
+const formatCurrency = (value) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
 export default function Painel({
@@ -14,7 +14,7 @@ export default function Painel({
 }) {
   const totalPecas = dashboardStats?.totalPieces || 0;
   const valorEstoque = dashboardStats?.totalInvestment || 0;
-  
+
   // crmWishlist é a contagem de interesses. Se undefined, 0.
   const leadsAtivos = Array.isArray(crmWishlist) ? crmWishlist.length : 0;
   const teamAtivo = activeTeamCount || 0;
@@ -38,39 +38,39 @@ export default function Painel({
       {/* Grid de Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatsCard
-            title="Valor Físico (Estoque)"
-            value={formatCurrency(valorEstoque)}
-            icon={<DollarSign className="w-5 h-5 text-indigo-500" />}
-            change={`${totalPecas} peças ativas no radar`}
-            changeType="positive"
-            className="bg-white"
-        />
-        
-        <StatsCard
-            title="Receita Realizada (Mes)"
-            value={formatCurrency(realTotalSales || 0)}
-            icon={<DollarSign className="w-5 h-5 text-emerald-500" />}
-            change="Baseado no histórico de vendas"
-            changeType="positive"
-            className="bg-white border-l-4 border-l-emerald-500"
+          title="Valor Físico (Estoque)"
+          value={formatCurrency(valorEstoque)}
+          icon={<DollarSign className="w-5 h-5 text-indigo-500" />}
+          change={`${totalPecas} peças ativas no radar`}
+          changeType="positive"
+          className="bg-white"
         />
 
         <StatsCard
-            title="Funil de Encomendas (CRM)"
-            value={leadsAtivos.toString()}
-            icon={<Bookmark className="w-5 h-5 text-purple-500" />}
-            change="Desejos/Reservas sinalizadas"
-            changeType="neutral"
-            className="bg-white"
+          title="Receita Realizada (Mes)"
+          value={formatCurrency(realTotalSales || 0)}
+          icon={<DollarSign className="w-5 h-5 text-emerald-500" />}
+          change="Baseado no histórico de vendas"
+          changeType="positive"
+          className="bg-white border-l-4 border-l-emerald-500"
         />
 
         <StatsCard
-            title="Força de Vendas (Ativa)"
-            value={teamAtivo.toString()}
-            icon={<Users className="w-5 h-5 text-blue-500" />}
-            change="Avaliados nos últimos 90d"
-            changeType="neutral"
-            className="bg-white"
+          title="Funil de Encomendas (CRM)"
+          value={leadsAtivos.toString()}
+          icon={<Bookmark className="w-5 h-5 text-purple-500" />}
+          change="Desejos/Reservas sinalizadas"
+          changeType="neutral"
+          className="bg-white"
+        />
+
+        <StatsCard
+          title="Força de Vendas (Ativa)"
+          value={teamAtivo.toString()}
+          icon={<Users className="w-5 h-5 text-blue-500" />}
+          change="Avaliados nos últimos 90d"
+          changeType="neutral"
+          className="bg-white"
         />
       </div>
     </div>

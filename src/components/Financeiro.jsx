@@ -87,7 +87,7 @@ function computeDRE(rawRevenue, multiplier, variableCosts, fixedCosts) {
   const margemResultado = receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0;
 
   return {
-    receitaBruta, deducoes, receitaLiquida, margemLiquida,
+    receitaBruta, impostos, taxasCartao, deducoes, receitaLiquida, margemLiquida,
     cmv, embalagens, obsolescencia, totalVariavel,
     margemContrib, percMC,
     totalFixo, resultado, margemResultado,
@@ -146,6 +146,18 @@ export default function Financeiro({
 
   const activeScenarioCfg = PREDICTIVE_SCENARIOS.find(s => s.id === predictiveScenario);
 
+  // ── Simulador de Imposto (Local State) ─────────────────────────
+  const [impostoInput, setImpostoInput] = useState('');
+  const [taxaCartaoInput, setTaxaCartaoInput] = useState('');
+
+  // Sincroniza os inputs sempre que a loja/período mudar (se finData.config estiver lá)
+  useEffect(() => {
+    if (finData?.config) {
+      setImpostoInput(String(finData.config.variableCosts.imposto));
+      setTaxaCartaoInput(String(finData.config.variableCosts.taxaCartao));
+    }
+  }, [selectedStore, selectedMonth, selectedYear, finData]);
+
   // ── Compute base financials ──────────────────────────────────
   const finData = useMemo(
     () => getFinancialData(selectedStore, selectedMonth, selectedYear),
@@ -165,16 +177,30 @@ export default function Financeiro({
   // ── DRE for each scenario ────────────────────────────────────
   const dres = useMemo(() => {
     if (!finData?.config) return null;
+
+    // Use input values Se validos, otherwise fallback to 0 to prevent NaN
+    const valImposto = impostoInput === '' ? 0 : parseFloat(impostoInput);
+    const activeImposto = isNaN(valImposto) ? 0 : valImposto;
+    
+    const valTaxaCartao = taxaCartaoInput === '' ? 0 : parseFloat(taxaCartaoInput);
+    const activeTaxaCartao = isNaN(valTaxaCartao) ? 0 : valTaxaCartao;
+
+    const customVariableCosts = {
+      ...finData.config.variableCosts,
+      imposto: activeImposto,
+      taxaCartao: activeTaxaCartao,
+    };
+
     return PREDICTIVE_SCENARIOS.reduce((acc, sc) => {
       acc[sc.id] = computeDRE(
         rawRevenue,
         sc.multiplier,
-        finData.config.variableCosts,
+        customVariableCosts,
         finData.config.fixedCosts,
       );
       return acc;
     }, {});
-  }, [rawRevenue, finData]);
+  }, [rawRevenue, finData, impostoInput, taxaCartaoInput]);
 
   if (!finData?.config || !dres) {
     return (
@@ -425,8 +451,38 @@ export default function Financeiro({
             <div className="text-xs font-bold text-orange-700 uppercase tracking-widest mb-2">
               (−) Impostos e Taxas de Cartão
             </div>
-            <MetricRow label={`Impostos (${finData.config.variableCosts.imposto}%)`} value={active.deducoes * (finData.config.variableCosts.imposto / (finData.config.variableCosts.imposto + finData.config.variableCosts.taxaCartao || 1))} />
-            <MetricRow label={`Taxa Cartão (${finData.config.variableCosts.taxaCartao}%)`} value={active.receitaBruta * (finData.config.variableCosts.taxaCartao / 100)} />
+            <MetricRow
+               label={
+                 <div className="flex items-center gap-2">
+                   <span>Impostos</span>
+                   <input
+                     type="number"
+                     step="0.01"
+                     className="w-16 p-1 text-sm border border-orange-300 rounded text-right text-orange-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                     value={impostoInput}
+                     onChange={(e) => setImpostoInput(e.target.value)}
+                   />
+                   <span className="text-orange-700 font-bold">%</span>
+                 </div>
+               }
+               value={active.impostos}
+            />
+            <MetricRow
+               label={
+                 <div className="flex items-center gap-2">
+                   <span>Taxa Cartão</span>
+                   <input
+                     type="number"
+                     step="0.01"
+                     className="w-16 p-1 text-sm border border-orange-300 rounded text-right text-orange-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                     value={taxaCartaoInput}
+                     onChange={(e) => setTaxaCartaoInput(e.target.value)}
+                   />
+                   <span className="text-orange-700 font-bold">%</span>
+                 </div>
+               }
+               value={active.taxasCartao}
+            />
             <div className="flex justify-between pt-2 border-t border-orange-200">
               <span className="font-bold text-orange-900 text-sm">Total Deduções</span>
               <span className="font-black font-mono text-orange-900">{formatCurrency(active.deducoes)}</span>

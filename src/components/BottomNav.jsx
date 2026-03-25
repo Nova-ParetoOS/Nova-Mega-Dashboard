@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart3, Package, Target, Users, Share2 } from 'lucide-react';
 
 const TABS = [

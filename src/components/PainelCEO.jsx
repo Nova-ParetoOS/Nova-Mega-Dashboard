@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   DollarSign,
   Target,
@@ -218,8 +218,8 @@ export default function PainelCEO({
             metaProgress >= 100
               ? 'bg-gradient-to-r from-emerald-400 to-teal-500'
               : metaProgress >= 70
-              ? 'bg-gradient-to-r from-indigo-400 to-purple-500'
-              : 'bg-gradient-to-r from-orange-400 to-amber-500'
+                ? 'bg-gradient-to-r from-indigo-400 to-purple-500'
+                : 'bg-gradient-to-r from-orange-400 to-amber-500'
           }
         />
 

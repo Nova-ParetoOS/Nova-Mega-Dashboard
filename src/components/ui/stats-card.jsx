@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export function StatsCard({ title, value, icon, change, changeType = 'neutral', className = '' }) {
   const changeColor =
     changeType === 'positive' ? 'text-emerald-600' :
-    changeType === 'negative' ? 'text-red-500' :
-    'text-gray-400';
+      changeType === 'negative' ? 'text-red-500' :
+        'text-gray-400';
 
   return (
     <div className={`rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-3 ${className}`}>

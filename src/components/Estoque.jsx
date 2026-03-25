@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Package, Upload, Search, CheckCircle, Copy, RefreshCw, AlertTriangle, ArrowDownCircle, ArrowUpCircle, BarChart3, Printer, Filter, SlidersHorizontal, X, TrendingUp, ChevronRight, AlertOctagon } from 'lucide-react';
 
 export default function Estoque(props) {
@@ -6,11 +6,11 @@ export default function Estoque(props) {
     selectedStore, setSelectedStore, STORE_CONFIGS,
     systemData, storeAuditData, sizeColumns,
     _seedAudit, isCompleted, setShowImportModal,
-    
+
     // Search states for audit
     searchTerm, setSearchTerm, filteredStoreSystemData,
     localAuditSearch, setLocalAuditSearch, filteredStoreAuditData, handleAuditChange,
-    
+
     // Dashboard (now Estoque) vars
     printMode, setPrintMode, showDashboardFilters, setShowDashboardFilters,
     dashboardSizeFilter, setDashboardSizeFilter, dashboardCategoryFilter, setDashboardCategoryFilter,
@@ -34,9 +34,9 @@ export default function Estoque(props) {
   };
 
   const handlePreencherComSistema = async () => {
-      const storeItems = systemData.filter(i => String(i.store_id || i.storeId) === String(selectedStore));
-      const uniqueStoreItems = Array.from(new Map(storeItems.map(i => [i.REFERENCIA, i])).values());
-      await _seedAudit(selectedStore, uniqueStoreItems);
+    const storeItems = systemData.filter(i => String(i.store_id || i.storeId) === String(selectedStore));
+    const uniqueStoreItems = Array.from(new Map(storeItems.map(i => [i.REFERENCIA, i])).values());
+    await _seedAudit(selectedStore, uniqueStoreItems);
   };
 
   // ── Divergências isoladas por tamanho ────────────────
@@ -536,7 +536,7 @@ export default function Estoque(props) {
                     <span className="font-bold text-orange-700">TAM {sizeColumns.find(s => parseInt(i.sizes[s]) > 0)}</span>
                   </div>
                 ))}
-            </div>
+              </div>
             </div>
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 shadow-sm">
               <h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><Package className="w-4 h-4" /> Estoque Pesado</h3>

@@ -598,8 +598,28 @@ export function useSupabaseData(userId) {
     }
   }, [crmCustomTags]);
 
+  const activateCollaboratorFromCandidate = useCallback(async (candidate) => {
+    if (!userId) return;
+    flash('saving');
+    // 1. Cria o colaborador na tabela employees
+    const { error: empError } = await supabase.from('employees').insert({
+      user_id: userId,
+      candidate_id: candidate.id,
+      name: candidate.nome,
+      store_id: candidate.loja,
+      role: candidate.cargo || 'Vendedora',
+      status: 'Ativo'
+    });
+    // 2. Atualiza o status no RH para 'Contratado'
+    if (!empError) {
+      await supabase.from('hr_candidates').update({ status: 'contratado' }).eq('id', candidate.id);
+      reloadAll();
+      flash('saved');
+    }
+  }, [userId, flash, reloadAll]);
+
   return {
     loading, syncStatus, userRole, userStoreId, systemData, auditData, salesHistory, dreValues, projectionSellers, marketingStatus, completedIds, sellerOverrides, hrCandidates, tasks, crmLeads, hrCollaborators, hrAbsences, crmWishlist, crmCustomTags,
-    setSystemData: setSystemDataForStore, setAuditData: seedAuditFromSystem, updateAuditItem, upsertSalesHistory, updateDreKey, deleteDreKey, toggleMarketing, upsertMarketingFields, setMarketingPhoto, toggleCompleted, setSellerOverride, saveHrCandidate, deleteHrCandidate, archiveHrCandidate, moveHrStatus, saveTask, deleteTask, archiveTask, moveTaskStatus, moveTaskCamada, updateProjectionSeller, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCrmLead, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, addCrmCustomTag, reloadAll
+    setSystemData: setSystemDataForStore, setAuditData: seedAuditFromSystem, updateAuditItem, upsertSalesHistory, updateDreKey, deleteDreKey, toggleMarketing, upsertMarketingFields, setMarketingPhoto, toggleCompleted, setSellerOverride, saveHrCandidate, deleteHrCandidate, archiveHrCandidate, moveHrStatus, activateCollaboratorFromCandidate, saveTask, deleteTask, archiveTask, moveTaskStatus, moveTaskCamada, updateProjectionSeller, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCrmLead, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, addCrmCustomTag, reloadAll
   };
 }
