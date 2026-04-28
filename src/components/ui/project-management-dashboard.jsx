@@ -476,6 +476,12 @@ export function ProjectDashboard({
                               <button title="WhatsApp" className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-white font-bold text-xs bg-green-500 hover:bg-green-600 shadow-sm transition-colors ml-1" onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "whatsapp"); }}><Icons.MessageCircle className="size-3.5" /> WPP</button>
                             </div>
                           </div>
+                          {p.showFlowButtons && (
+                            <div className={`flex items-center w-full mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${p.disablePrevFlow && !p.disableNextFlow ? 'justify-end' : p.disableNextFlow && !p.disablePrevFlow ? 'justify-start' : 'justify-between'}`}>
+                              {!p.disablePrevFlow && <button onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "prev"); }} className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all focus:outline-none">&laquo; Anterior</button>}
+                              {!p.disableNextFlow && <button onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "next"); }} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-100 hover:bg-teal-100 transition-all focus:outline-none">Próximo &raquo;</button>}
+                            </div>
+                          )}
                         </article>
                       );
                     })}
@@ -510,6 +516,12 @@ export function ProjectDashboard({
                         <button title="WhatsApp" className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-white font-bold text-xs bg-green-500 hover:bg-green-600 shadow-sm transition-colors ml-1" onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "whatsapp"); }}><Icons.MessageCircle className="size-3.5" /> WPP</button>
                       </div>
                     </div>
+                    {p.showFlowButtons && viewMode !== "list" && (
+                      <div className={`flex items-center w-full mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${p.disablePrevFlow && !p.disableNextFlow ? 'justify-end' : p.disableNextFlow && !p.disablePrevFlow ? 'justify-start' : 'justify-between'}`}>
+                        {!p.disablePrevFlow && <button onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "prev"); }} className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all focus:outline-none">&laquo; Anterior</button>}
+                        {!p.disableNextFlow && <button onClick={(e) => { e.stopPropagation(); onProjectAction?.(p.id, "next"); }} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-100 hover:bg-teal-100 transition-all focus:outline-none">Próximo &raquo;</button>}
+                      </div>
+                    )}
                   </article>
                 );
               })

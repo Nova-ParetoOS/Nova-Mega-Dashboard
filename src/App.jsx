@@ -10,7 +10,8 @@ import Financeiro from './components/Financeiro';
 import Estoque from './components/Estoque';
 import { Metas } from './components/Metas';
 import Divulgacao from './components/Divulgacao';
-import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal, LogOut } from 'lucide-react';
+import { Configuracoes } from './modules/Configuracoes';
+import { Package, AlertTriangle, Save, RefreshCw, CheckCircle, Search, ArrowRight, Download, Upload, X, Copy, Trash2, CheckSquare, List, ArrowDownCircle, ArrowUpCircle, BarChart3, TrendingUp, Sparkles, AlertOctagon, FileJson, Printer, ChevronLeft, ChevronDown, ChevronUp, Share2, Camera, Smartphone, Instagram, Calendar, ArrowDownUp, EyeOff, CameraOff, PlusCircle, Send, Archive, Calculator, Target, DollarSign, PieChart, Users, TrendingDown, Award, UserCheck, UserMinus, Filter, ChevronRight, SlidersHorizontal, LogOut, Settings } from 'lucide-react';
 // ==========================================
 // 1. CONFIGURAÇÕES FINANCEIRA DAS LOJAS
 // ==========================================
@@ -60,12 +61,14 @@ const calculateTotal = (sizesObj) => sizeColumns.reduce((acc, size) => acc + (pa
 
 const parseDate = (dateStr) => {
   if (!dateStr) return 0;
+  if (dateStr.includes('/')) {
+    try {
+      const parts = dateStr.split(' ')[0].split('/');
+      if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+    } catch (e) { return 0; }
+  }
   const isoDate = new Date(dateStr);
   if (!isNaN(isoDate.getTime())) return isoDate.getTime();
-  try {
-    const parts = dateStr.split(' ')[0].split('/');
-    if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
-  } catch (e) { return 0; }
   return 0;
 };
 
@@ -81,6 +84,22 @@ const getMonthName = (monthIndex) => {
   const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   return months[monthIndex - 1] || "";
 };
+
+// ==========================================
+// COMPONENTE: ACESSO NEGADO (RBAC Guard)
+// ==========================================
+const AcessoNegado = ({ titulo = 'Acesso Restrito', descricao = 'Esta seção é acessível somente para o Proprietário.' }) => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-8 text-center bg-white rounded-2xl shadow-sm border border-gray-100">
+    <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-5">
+      <span className="text-4xl select-none">🔒</span>
+    </div>
+    <h2 className="text-2xl font-black text-gray-800 mb-2">{titulo}</h2>
+    <p className="text-sm text-gray-500 max-w-xs leading-relaxed">{descricao}</p>
+    <p className="text-xs text-gray-400 mt-4 bg-gray-100 px-3 py-1.5 rounded-full font-mono">
+      Permissão necessária: <span className="font-bold text-indigo-600">owner</span>
+    </p>
+  </div>
+);
 
 const roundToSpecial = (value) => {
   if (value <= 0) return 0;
@@ -338,8 +357,8 @@ const App = () => {
     projectionSellers,
     updateProjectionSellers,
     marketingStatus,
-    completedIds,
     sellerOverrides,
+    sellerStoreMap,
     hrCandidates,
     setSystemData: _setSystemData,
     setAuditData: _seedAudit,
@@ -348,8 +367,10 @@ const App = () => {
     updateDreKey,
     deleteDreKey,
     toggleMarketing: _toggleMarketing,
-    toggleCompleted: _toggleCompleted,
     setSellerOverride: _setSellerOverride,
+    updateSellerStore: _updateSellerStore,
+    saveDreScenario,
+    loadDreScenario,
     saveHrCandidate: _saveHrCandidate,
     deleteHrCandidate: _deleteHrCandidate,
     moveHrStatus: _moveHrStatus,
@@ -371,11 +392,28 @@ const App = () => {
     deleteCrmWishlist,
     updateCrmWishlistStatus,
     addCrmCustomTag,
+    getSystemProfiles: _getSystemProfiles,
+    saveSystemProfile: _saveSystemProfile,
+    deleteSystemProfile: _deleteSystemProfile,
     archiveHrCandidate,
     setMarketingPhoto: _setMarketingPhoto,
     upsertMarketingFields: _upsertMarketingFields,
     reloadAll,
+    userRole,
+    userStoreId,
   } = useSupabaseData(userId);
+
+  const roleSeguro = userRole || 'owner';
+
+  useEffect(() => {
+    // Soft-lock RBAC Seguro: gerente fica travado na sua loja; owner padrão é Todas.
+    if (roleSeguro === 'gerente' && userStoreId) {
+      setSelectedStore(String(userStoreId));
+    } else if (roleSeguro === 'owner') {
+      // Owner abre sempre com visão global — só altera se ainda estiver no default '10'
+      setSelectedStore(prev => (prev === '10' ? 'Todas' : prev));
+    }
+  }, [roleSeguro, userStoreId]);
 
   // --- UI State (não persistido) ---
   const [dreScenario, setDreScenario] = useState('base');
@@ -502,8 +540,10 @@ const App = () => {
     const { breakEven, activeSellers } = currentFinancial;
     const numSellers = numSellersOverride != null ? numSellersOverride : (activeSellers > 0 ? activeSellers : 1);
 
-    // === HISTÓRICO ÚLTIMOS 3 ANOS ===
-    const last3Years = [2024, 2025, 2026];
+    // === HISTÓRICO ÚLTIMOS 3 ANOS (apenas anos fiscais FECHADOS) ===
+    // Exclui o ano vigente para não distorcer a média com dados parciais.
+    const closedYears = [2022, 2023, 2024, 2025].filter(y => y < currentYear);
+    const last3Years = closedYears.slice(-3); // pega os 3 mais recentes
     const last3YearsRaw = last3Years.map(y => {
       const periodKey = `${y}-${String(month).padStart(2, '0')}`;
       return salesHistory.filter(h => h?.storeCode == storeId && h?.period === periodKey)
@@ -531,58 +571,37 @@ const App = () => {
     const baseMedia = mediaUltimos3Anos > 0 ? mediaUltimos3Anos : breakEven;
 
     // =====================================================
-    // 1. META BRONZE INDIVIDUAL (B_ind) — Lógica 2.1
-    // Fórmula: (Média 3 anos × F_vend × 0.80) ÷ Vendedoras
-    // Fator Newbie 0.80: Bronze é 20% menor que o potencial máx do time
-    // Trava: SEM piso de R$ 20.000
+    // NOVA MATEMÁTICA DAS METAS (Spec CTO v3.0)
+    // A Meta Loja NUNCA é afetada pelo número de vendedoras.
+    // Deriva-se da Média Histórica e do Break-Even.
     // =====================================================
-    const bronzeIndRaw = (baseMedia * fVend * 0.80) / numSellers;
-    const metaBronzeInd = roundToSpecial(bronzeIndRaw);
 
-    // =====================================================
-    // 2. META BRONZE LOJA (B_loja) — Lógica 2.1
-    // Fórmula: B_ind × Vendedoras
-    // =====================================================
-    const metaBronzeLoja = roundToSpecial(metaBronzeInd * numSellers);
+    const base = mediaUltimos3Anos > 0 ? mediaUltimos3Anos : breakEven;
 
-    // =====================================================
-    // 3. META PRATA INDIVIDUAL (P_ind) — Lógica 2.1
-    // Fórmula: (Média 3 anos × 1,10) ÷ Vendedoras
-    // Travas: P_ind >= B_ind  e  P_ind <= Recorde × 1,05
-    // =====================================================
-    // =====================================================
-    // 3. META PRATA INDIVIDUAL (P_ind) — Spec v2.2
-    // Fórmula: MAX(B_ind ; round900((M * 1.10) / V))
-    // Trava: resultado final <= Recorde × 1.05 / V
-    // =====================================================
-    const prataIndRound = roundToSpecial((baseMedia * 1.10) / numSellers);
-    const prataIndMax = recorde > 0 ? recorde * 1.05 : Infinity;
-    const metaPrataInd = Math.min(Math.max(metaBronzeInd, prataIndRound), prataIndMax);
+    // 1. BRONZE ────────────────────────────────────────
+    // bronzeLoja = média × 0.85
+    // bronzeInd  = bronzeLoja / N
+    const metaBronzeLoja = roundToSpecial(base * 0.85);
+    const metaBronzeInd  = roundToSpecial(metaBronzeLoja / numSellers);
 
-    // =====================================================
-    // 4. META PRATA LOJA (P_loja) — Spec v2.2
-    // Fórmula: MAX(B_loja ; round900(P_ind × V))
-    // =====================================================
-    const metaPrataLoja = Math.max(metaBronzeLoja, roundToSpecial(metaPrataInd * numSellers));
+    // 2. PRATA ─────────────────────────────────────────
+    // prataLoja = MAX(média × 1.10 ; breakEven)
+    // prataInd  = prataLoja / N   (trava: ≤ recorde × 1.05)
+    const prataLojaRaw  = Math.max(base * 1.10, breakEven);
+    const metaPrataLoja = roundToSpecial(prataLojaRaw);
+    const prataIndRaw   = metaPrataLoja / numSellers;
+    const prataIndMax   = recorde > 0 ? recorde * 1.05 : Infinity;
+    const metaPrataInd  = roundToSpecial(Math.min(prataIndRaw, prataIndMax));
 
-    // =====================================================
-    // 5. META OURO LOJA (O_loja) — Spec v2.2 (calculada ANTES de O_ind)
-    // Fórmula: MAX(P_loja ; BE ; round900(M × 1.15 × 1.02))
-    // =====================================================
-    const ouroLojaHist = mediaUltimos3Anos > 0 ? roundToSpecial(mediaUltimos3Anos * 1.15 * 1.02) : 0;
-    const metaOuroLoja = Math.max(metaPrataLoja, breakEven, ouroLojaHist);
-
-    // =====================================================
-    // 6. META OURO INDIVIDUAL (O_ind) — Spec v2.2
-    // Fórmula: MAX(20000 ; P_ind ; round900(O_loja / V))
-    // Trava: resultado final <= Recorde × 1.15
-    // =====================================================
-    const ouroIndRound = roundToSpecial(metaOuroLoja / numSellers);
-    const ouroIndMax = recorde > 0 ? recorde * 1.15 : Infinity;
-    const metaOuroInd = Math.min(Math.max(20000, metaPrataInd, ouroIndRound), ouroIndMax);
+    // 3. OURO ──────────────────────────────────────────
+    // ouroLoja = MAX(média × 1.15 ; breakEven × 1.10)
+    // ouroInd  = ouroLoja / N
+    const ouroLojaRaw  = Math.max(base * 1.15, breakEven * 1.10);
+    const metaOuroLoja = roundToSpecial(ouroLojaRaw);
+    const metaOuroInd  = roundToSpecial(metaOuroLoja / numSellers);
 
     // === HISTÓRICO PARA O GRÁFICO ===
-    const baseHistory = [2022, 2023, 2024, 2025, 2026];
+    const baseHistory = [2021, 2022, 2023, 2024, 2025, 2026];
     const currentYearNum = new Date().getFullYear();
     let historyYears = [...new Set([...baseHistory, currentYearNum])].sort();
     historyYears = historyYears.filter(yr => yr <= Number(selectedYear));
@@ -690,8 +709,8 @@ const App = () => {
     }).filter(i => i && i.hasDifference);
   }, [systemData, auditData, selectedStore]);
 
-  const exits = differences.filter(d => d.diffTotal < 0 && !(completedIds.has(`${d.store_id || selectedStore}|${d.id}`) || completedIds.has(String(d.id))));
-  const entries = differences.filter(d => d.diffTotal > 0 && !(completedIds.has(`${d.store_id || selectedStore}|${d.id}`) || completedIds.has(String(d.id))));
+  const exits = differences.filter(d => d.diffTotal < 0);
+  const entries = differences.filter(d => d.diffTotal > 0);
 
   // Dados de auditoria filtrados pela loja selecionada no dashboard
   const dashboardAuditData = useMemo(() => {
@@ -808,20 +827,6 @@ const App = () => {
     setShowResetModal(false);
   };
 
-  // toggleCompleted: aceita "storeId|itemId" ou itemId numérico (legado)
-  const toggleCompleted = (splitIdOrId) => {
-    if (typeof splitIdOrId === 'string' && splitIdOrId.includes('|')) {
-      const [storeId, itemId] = splitIdOrId.split('|');
-      _toggleCompleted(storeId, Number(itemId));
-    } else {
-      _toggleCompleted(selectedStore, Number(splitIdOrId));
-    }
-  };
-
-  const isCompleted = (itemId, storeId) => {
-    const sc = storeId || selectedStore;
-    return completedIds.has(`${sc}|${itemId}`) || completedIds.has(String(itemId));
-  };
 
   const toggleCategory = (category) => { const newSet = new Set(expandedCategories); newSet.has(category) ? newSet.delete(category) : newSet.add(category); setExpandedCategories(newSet); };
 
@@ -838,17 +843,19 @@ const App = () => {
   const getMktStatus = (item) => {
     const key = getItemKey(item);
     const storeId = item.store_id || item.storeId || selectedStore;
-    return marketingStatus[`${storeId}|${key}`] || marketingStatus[key] || {};
+    return marketingStatus[`${storeId}|${key}`] || marketingStatus[`all|${key}`] || marketingStatus[key] || {};
   };
 
   // Converte URL do Google Drive em URL de thumbnail direta
   const getGDriveThumbnail = (url) => {
     if (!url) return null;
-    const matchD = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (matchD) return `https://drive.google.com/thumbnail?id=${matchD[1]}&sz=w200`;
+    // Regex à prova de falhas: captura o file ID de qualquer link /file/d/{ID}
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+    // Fallback: link com ?id= explícito
     const matchId = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (matchId) return `https://drive.google.com/thumbnail?id=${matchId[1]}&sz=w200`;
-    // URL direta de imagem (jpg, png, etc.)
+    if (matchId) return `https://drive.google.com/thumbnail?id=${matchId[1]}&sz=w1000`;
+    // URL direta de imagem
     if (url.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i)) return url;
     return url;
   };
@@ -909,9 +916,10 @@ const App = () => {
   const marketingItems = useMemo(() => {
     // Divulgação usa visão GLOBAL — todas as lojas para facilitar gestão de postagens.
     // O filtro interno (marketingStore) ainda limita dentro desta aba.
+    // FONTE: systemData (tem TIPODESC, COR1DESC, DATAENTRADA via normalizeSystemRow)
     const storeFiltered = (() => {
-      if (marketingStore === 'all') return auditData;
-      return auditData.filter(i => (i.store_id || i.storeId) === marketingStore);
+      if (marketingStore === 'all') return systemData;
+      return systemData.filter(i => (i.store_id || i.storeId) === marketingStore);
     })();
 
     let filtered = storeFiltered.filter(item => {
@@ -929,24 +937,28 @@ const App = () => {
       if (marketingSort === 'no-photo') return stock > 0 && !mStatus.photo && matchesSearch;
       if (marketingSort === 'no-catalog') return stock > 0 && mStatus.photo && !mStatus.catalog && matchesSearch;
       if (marketingSort === 'to-post') return stock > 0 && mStatus.photo && mStatus.catalog && !mStatus.posted && matchesSearch;
+      // FIX #2: Aba 'Postados' — trava estrita. Só renderiza posted === true.
+      if (marketingSort === 'posted') return mStatus.posted === true && matchesSearch;
       return stock > 0 && matchesSearch;
     });
     return filtered.sort((a, b) => {
       if (marketingSort === 'recent') return parseDate(b.DATAENTRADA) - parseDate(a.DATAENTRADA);
+      if (marketingSort === 'oldest') return parseDate(a.DATAENTRADA) - parseDate(b.DATAENTRADA);
       if (marketingSort === 'quantity') return calculateTotal(b.sizes) - calculateTotal(a.sizes);
       return 0;
     });
-  }, [auditData, searchTerm, marketingStatus, marketingSort, marketingStore]);
+  }, [systemData, searchTerm, marketingStatus, marketingSort, marketingStore]);
 
   // Itens na fila: in_queue true, ainda não postados
+  // FONTE: systemData (coerente com marketingItems)
   const queueItems = useMemo(() => {
-    return auditData.filter(item => {
+    return systemData.filter(item => {
       const key = getItemKey(item);
       const storeId = item.store_id || item.storeId || 'all';
       const mStatus = marketingStatus[`${storeId}|${key}`] || marketingStatus[key] || {};
       return mStatus.in_queue === true && mStatus.posted !== true && !mStatus.discontinued;
     });
-  }, [auditData, marketingStatus]);
+  }, [systemData, marketingStatus]);
 
   // --- RENDERIZAÇÃO COMPONENTES ---
   const GroupedDifferenceTable = ({ items, title, icon: Icon, colorClass, bgClass, isExit }) => {
@@ -1094,11 +1106,14 @@ const App = () => {
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-white to-emerald-50/30 p-6 rounded-2xl border border-emerald-100 shadow-lg no-print">
-          <h2 className="text-2xl font-bold text-emerald-800 flex items-center gap-2 mb-4"><PieChart className="w-6 h-6" /> DRE - Demonstração do Resultado do Exercício</h2>
+          <h2 className="text-2xl font-bold text-emerald-800 flex items-center gap-2"><PieChart className="w-6 h-6" /> DRE - Demonstração do Resultado do Exercício</h2>
           <div className="flex flex-wrap gap-3 mb-5">
-            <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Object.entries(STORE_CONFIGS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}</select>
+            <select value={selectedStore} disabled={roleSeguro === 'gerente'} onChange={e => setSelectedStore(e.target.value)} className={`border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none ${roleSeguro === 'gerente' ? 'opacity-50 cursor-not-allowed bg-emerald-50' : ''}`}>
+              {roleSeguro === 'owner' && <option value="Todas">🌐 Todas as Lojas</option>}
+              {Object.entries(STORE_CONFIGS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+            </select>
             <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>)}</select>
-            <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 5 }, (_, i) => <option key={i} value={2023 + i}>{2023 + i}</option>)}</select>
+            <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 7 }, (_, i) => <option key={i} value={2021 + i}>{2021 + i}</option>)}</select>
           </div>
           <div className="flex flex-wrap gap-3">
             {SCENARIOS.map(({ id, label, activeClass, hoverClass, description }) => (
@@ -1333,8 +1348,8 @@ const App = () => {
                   <label className="block text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">🏪 Loja de Destino — Dados serão isolados por loja</label>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(STORE_CONFIGS).map(([k, v]) => (
-                      <button key={k} onClick={() => setImportTargetStore(k)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${importTargetStore === k ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                      <button key={k} disabled={roleSeguro === 'gerente' && String(userStoreId) !== String(k)} onClick={() => setImportTargetStore(k)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${importTargetStore === k ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'} ${(roleSeguro === 'gerente' && String(userStoreId) !== String(k)) ? 'opacity-30 cursor-not-allowed hover:border-gray-200' : ''}`}>
                         {v.name}
                       </button>
                     ))}
@@ -1367,7 +1382,7 @@ const App = () => {
 
       {!printMode && (
         <nav className="hidden md:block bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm no-print overflow-x-auto">
-          <div className="max-w-7xl mx-auto flex px-4">
+          <div className={['crm'].includes(activeTab) ? "w-full h-full mx-auto flex px-4 md:px-8" : ['divulgacao'].includes(activeTab) ? "w-[90%] max-w-none mx-auto flex px-4 md:px-6" : "max-w-7xl mx-auto flex px-4"}>
             <div className="flex overflow-x-auto">
               <button onClick={() => changeTab('dashboard')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><BarChart3 className="w-4 h-4 inline mr-1" /> 1. Painel</button>
               <button onClick={() => changeTab('audit')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${['audit', 'system', 'diff'].includes(activeTab) ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Package className="w-4 h-4 inline mr-1" /> 2. Estoque</button>
@@ -1376,6 +1391,9 @@ const App = () => {
               <button onClick={() => changeTab('marketing')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'marketing' ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Share2 className="w-4 h-4 inline mr-1" /> 5. Divulgação</button>
               <button onClick={() => changeTab('viability')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'viability' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><PieChart className="w-4 h-4 inline mr-1" /> 6. DRE</button>
               <button onClick={() => changeTab('crm')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'crm' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4 inline mr-1" /> 7. CRM</button>
+              {userRole === 'owner' && (
+                <button onClick={() => changeTab('config')} className={`py-4 px-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === 'config' ? 'border-amber-500 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Settings className="w-4 h-4 inline mr-1" /> 8. Configurações</button>
+              )}
             </div>
             {/* Logout — far right */}
             <button
@@ -1388,7 +1406,11 @@ const App = () => {
         </nav>
       )}
 
-      <main className={['crm'].includes(activeTab) ? 'w-full h-screen' : `max-w-7xl mx-auto p-4 md:p-6 ${printMode ? 'pt-20' : ''}`}>
+      <main className={
+        ['crm'].includes(activeTab) ? 'w-full h-screen' :
+          ['divulgacao'].includes(activeTab) ? `w-full md:w-[90%] max-w-none mx-auto p-4 md:p-6 ${printMode ? 'pt-20' : ''}` :
+            `max-w-7xl mx-auto p-4 md:p-6 ${printMode ? 'pt-20' : ''}`
+      }>
 
         {/* ═══════════════════════════════════════════════════
             ABA UNIFICADA: AUDITORIA DE ESTOQUE
@@ -1400,7 +1422,7 @@ const App = () => {
           <Estoque
             selectedStore={selectedStore} setSelectedStore={setSelectedStore} STORE_CONFIGS={STORE_CONFIGS}
             systemData={systemData} storeAuditData={storeAuditData} sizeColumns={sizeColumns}
-            _seedAudit={_seedAudit} isCompleted={isCompleted} setShowImportModal={setShowImportModal}
+            _seedAudit={_seedAudit} setShowImportModal={setShowImportModal}
             searchTerm={searchTerm} setSearchTerm={setSearchTerm} filteredStoreSystemData={filteredStoreSystemData}
             localAuditSearch={localAuditSearch} setLocalAuditSearch={setLocalAuditSearch}
             filteredStoreAuditData={filteredStoreAuditData} handleAuditChange={handleAuditChange}
@@ -1471,21 +1493,26 @@ const App = () => {
         )}
 
         {activeTab === 'viability' && (
-          <Financeiro
-            selectedStore={selectedStore}
-            setSelectedStore={setSelectedStore}
-            selectedMonth={selectedMonth}
-            setSelectedMonth={setSelectedMonth}
-            selectedYear={selectedYear}
-            setSelectedYear={setSelectedYear}
-            STORE_CONFIGS={STORE_CONFIGS}
-            getFinancialData={getFinancialData}
-            getGoalsData={getGoalsData}
-            getHistoricalDataForStorePeriod={getHistoricalDataForStorePeriod}
-            dreValues={dreValues}
-            updateDreKey={updateDreKey}
-            deleteDreKey={deleteDreKey}
-          />
+          roleSeguro !== 'owner' 
+            ? <AcessoNegado titulo="DRE Restrito" descricao="O módulo financeiro (DRE e Viabilidade) é acessível somente para o Proprietário do sistema." /> 
+            : <Financeiro
+                selectedStore={selectedStore}
+                setSelectedStore={setSelectedStore}
+                selectedMonth={selectedMonth}
+                setSelectedMonth={setSelectedMonth}
+                selectedYear={selectedYear}
+                setSelectedYear={setSelectedYear}
+                STORE_CONFIGS={STORE_CONFIGS}
+                getFinancialData={getFinancialData}
+                getGoalsData={getGoalsData}
+                getHistoricalDataForStorePeriod={getHistoricalDataForStorePeriod}
+                dreValues={dreValues}
+                updateDreKey={updateDreKey}
+                deleteDreKey={deleteDreKey}
+                saveDreScenario={saveDreScenario}
+                loadDreScenario={loadDreScenario}
+                salesHistory={salesHistory}
+              />
         )}
         {activeTab === 'goals' && (
           <Metas
@@ -1503,6 +1530,7 @@ const App = () => {
             hasHistoricalData={hasHistoricalData}
             printMode={printMode} setPrintMode={setPrintMode}
             upsertSalesHistory={upsertSalesHistory}
+            setShowImportModal={setShowImportModal}
             goalsSellerOverride={goalsSellerOverride} setGoalsSellerOverride={setGoalsSellerOverride}
             selectedSellerNames={selectedSellerNames} setSelectedSellerNames={setSelectedSellerNames}
             getMonthName={getMonthName}
@@ -1529,7 +1557,23 @@ const App = () => {
             crmCustomTags={crmCustomTags || []}
             addCrmCustomTag={addCrmCustomTag}
             selectedStore={selectedStore}
+            systemData={systemData || []}
+            userRole={userRole}
+            STORE_CONFIGS={STORE_CONFIGS}
           />
+        )}
+
+        {/* ═══════════════════ ABA CONFIGURACOES ════════════════════════ */}
+        {activeTab === 'config' && (
+          roleSeguro !== 'owner'
+            ? <AcessoNegado titulo="Configurações Restritas" descricao="O painel de Configurações só pode ser acessado pelo Proprietário do sistema." />
+            : <Configuracoes 
+                userRole={userRole}
+                STORE_CONFIGS={STORE_CONFIGS}
+                getSystemProfiles={_getSystemProfiles}
+                saveSystemProfile={_saveSystemProfile}
+                deleteSystemProfile={_deleteSystemProfile}
+              />
         )}
 
         {/* ═══════════════════ ABA RH ═══════════════════ */}
@@ -1674,118 +1718,6 @@ const App = () => {
           return (
             <div className="space-y-6">
 
-              {/* ─── EQUIPE DE VENDAS ATIVA (fonte: salesHistory) ─── */}
-              {(() => {
-                // Limite flexível pelos botões de tempo
-                const cutoff = new Date(Date.now() - activeDaysFilter * 86400000);
-
-                const sellerMap = {};
-                // Filtro na raiz: contabilizar apenas vendas e períodos da loja selecionada (se houver)
-                const relevantHistory = hrFilterStore !== 'all' 
-                  ? salesHistory.filter(h => String(h.storeCode) === hrFilterStore)
-                  : salesHistory;
-                
-                relevantHistory.forEach(h => {
-                  const name = (h.sellerName || '').trim();
-                  if (!name || /MEGA|EXTRA/i.test(name)) return;
-                  if (!sellerMap[name]) sellerMap[name] = {
-                    name, stores: new Set(), totalSales: 0, daysWorked: 0,
-                    totalPeriods: 0, lastPeriod: '', lastDaysWorked: 0
-                  };
-                  sellerMap[name].stores.add(String(h.storeCode));
-                  sellerMap[name].totalSales += (h.totalSales || 0);
-                  sellerMap[name].daysWorked += (h.daysWorked || 0);
-                  sellerMap[name].totalPeriods += 1;
-                  if ((h.period || '') > sellerMap[name].lastPeriod) {
-                    sellerMap[name].lastPeriod = h.period;
-                    sellerMap[name].lastDaysWorked = h.daysWorked || 0;
-                  }
-                });
-
-                const allSellers = Object.values(sellerMap)
-                  .filter(s => {
-                    if (!s.lastPeriod) return false;
-                    const [yyyy, mm] = s.lastPeriod.split('-').map(Number);
-                    const lastDate = new Date(yyyy, mm - 1, 28);
-                    // Filtro duplo: recência ≤ 60 dias E ≥ 5 dias trabalhados no último período
-                    return lastDate >= cutoff && s.lastDaysWorked >= 5;
-                  })
-                  .sort((a, b) => b.totalSales - a.totalSales);
-
-                const filteredSellers = allSellers.filter(s => {
-                  if (hrSearch && !s.name.toLowerCase().includes(hrSearch.toLowerCase())) return false;
-                  return true;
-                });
-
-                return (
-                  <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-white flex flex-wrap items-center gap-3 justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-sm">
-                          <Users className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-800">Equipe de Vendas Ativa</h3>
-                          <p className="text-xs text-gray-400">
-                            {filteredSellers.length} vendedora{filteredSellers.length !== 1 ? 's' : ''} ativas nos últimos {activeDaysFilter} dias
-                            &nbsp;· MEGA/EXTRA excluídos · filtra com seletor de loja acima
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200 shadow-inner">
-                        <button onClick={() => setActiveDaysFilter(30)} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ${activeDaysFilter === 30 ? 'bg-teal-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-teal-700 hover:bg-teal-50'}`}>1 mês</button>
-                        <button onClick={() => setActiveDaysFilter(60)} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ${activeDaysFilter === 60 ? 'bg-teal-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-teal-700 hover:bg-teal-50'}`}>2 meses</button>
-                        <button onClick={() => setActiveDaysFilter(90)} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ${activeDaysFilter === 90 ? 'bg-teal-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-teal-700 hover:bg-teal-50'}`}>3 meses</button>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm min-w-[560px]">
-                        <thead className="bg-gray-50 border-b border-gray-100">
-                          <tr>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400">#</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400">Vendedora</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-400">Loja(s)</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-400 w-48">Constância</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-400">Último Mês</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {filteredSellers.length === 0 && (
-                            <tr><td colSpan={5} className="py-10 text-center text-gray-300 text-sm">Nenhuma vendedora ativa nos últimos {activeDaysFilter} dias</td></tr>
-                          )}
-                          {filteredSellers.map((s, i) => {
-                            const maxDays = s.totalPeriods * 30;
-                            const constPct = maxDays > 0 ? Math.min(100, Math.round((s.daysWorked / maxDays) * 100)) : 0;
-                            const constColor = constPct >= 70 ? 'bg-emerald-500' : constPct >= 40 ? 'bg-amber-400' : 'bg-red-400';
-                            return (
-                              <tr key={s.name} className="hover:bg-teal-50/30 transition-colors">
-                                <td className="px-4 py-3 text-xs font-black text-teal-600">{i + 1}</td>
-                                <td className="px-4 py-3 font-semibold text-gray-800">{s.name}</td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex flex-wrap justify-center gap-1">
-                                    {[...s.stores].sort().map(st => (
-                                      <span key={st} className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">L{st}</span>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                                      <div className={`h-2 rounded-full transition-all ${constColor}`} style={{ width: `${constPct}%` }} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-500 w-8 text-right">{constPct}%</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-center text-xs text-gray-400">{s.lastPeriod ? s.lastPeriod.slice(0, 7) : '—'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* HEADER */}
               <div className="bg-gradient-to-br from-white to-teal-50/30 p-6 rounded-2xl border border-teal-100 shadow-lg">
@@ -1935,11 +1867,11 @@ const App = () => {
                   const visible = isExpanded ? colCandidates : colCandidates.slice(0, 10);
                   const hasMore = colCandidates.length > 10;
                   return (
-                    <div key={col.id} 
-                         className={`rounded-2xl border transition-all overflow-hidden flex flex-col ${hrDragOverCol === col.id ? 'bg-teal-50 border-teal-400 ring-2 ring-teal-100' : 'bg-gray-50 border-gray-200'}`}
-                         onDragOver={e => { e.preventDefault(); setHrDragOverCol(col.id); }}
-                         onDragLeave={() => setHrDragOverCol(null)}
-                         onDrop={e => hrHandleDrop(e, col.id)}
+                    <div key={col.id}
+                      className={`rounded-2xl border transition-all overflow-hidden flex flex-col ${hrDragOverCol === col.id ? 'bg-teal-50 border-teal-400 ring-2 ring-teal-100' : 'bg-gray-50 border-gray-200'}`}
+                      onDragOver={e => { e.preventDefault(); setHrDragOverCol(col.id); }}
+                      onDragLeave={() => setHrDragOverCol(null)}
+                      onDrop={e => hrHandleDrop(e, col.id)}
                     >
                       <div className={`bg-gradient-to-r ${col.bg} text-white px-4 py-3 flex items-center justify-between shrink-0`}>
                         <span className="font-bold text-sm">{col.emoji} {col.label}</span>
@@ -1960,10 +1892,10 @@ const App = () => {
                           const phoneClean = String(c.telefone || '').replace(/\D/g, '');
                           const isTerminal = ['contratado', 'finalizado', 'banco_talentos'].includes(col.id);
                           return (
-                            <div key={c.id} 
-                                 draggable
-                                 onDragStart={e => hrHandleDragStart(e, c)}
-                                 className={`bg-white rounded-xl border shadow-sm transition-all group cursor-grab active:cursor-grabbing ${slaAlert ? 'border-red-200 ring-1 ring-red-200' : 'border-gray-100 hover:border-gray-200 hover:shadow-md'}`}>
+                            <div key={c.id}
+                              draggable
+                              onDragStart={e => hrHandleDragStart(e, c)}
+                              className={`bg-white rounded-xl border shadow-sm transition-all group cursor-grab active:cursor-grabbing ${slaAlert ? 'border-red-200 ring-1 ring-red-200' : 'border-gray-100 hover:border-gray-200 hover:shadow-md'}`}>
                               <div className="p-3">
                                 <div className="flex items-start justify-between gap-1 mb-1.5">
                                   <div className="flex-1 min-w-0">
@@ -1987,29 +1919,33 @@ const App = () => {
                                   </a>
                                 )}
                               </div>
-                              <div className="overflow-hidden max-h-0 group-hover:max-h-96 transition-all duration-200 ease-in-out border-t border-gray-50 group-hover:border-gray-100">
-                                <div className="p-2.5 pt-2">
-                                  <div className="flex flex-wrap gap-1 mb-1.5">
-                                    {HR_STATUS.filter(s => s.id !== col.id).map(s => (
-                                      <button key={s.id} onClick={() => moveStatus(c.id, s.id)}
-                                        className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700 hover:bg-teal-50 transition-all leading-none">
-                                        → {s.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <div className="flex items-center justify-between mt-1">
-                                    {isTerminal && (
-                                      <button onClick={() => archiveHrCandidate(c.id)}
-                                        className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-lg border border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100 transition-all">
-                                        📦 Arquivar
-                                      </button>
-                                    )}
-                                    <button onClick={() => deleteCandidate(c.id)}
-                                      className="ml-auto text-[10px] px-2 py-1 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 transition-all">
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
+                              {/* ─ Botões de Fluxo Horizontal: Anterior / Próximo ─ */}
+                              <div className="px-3 pb-3 flex items-center justify-between gap-2">
+                                {(() => {
+                                  const idx = HR_STATUS.findIndex(s => s.id === col.id);
+                                  const hasPrev = idx > 0;
+                                  const hasNext = idx < HR_STATUS.length - 1;
+                                  return (
+                                    <>
+                                      {hasPrev ? (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); moveStatus(c.id, HR_STATUS[idx - 1].id); }}
+                                          className="flex-1 text-[10px] font-bold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-700 hover:bg-teal-50 transition-all"
+                                        >
+                                          « {HR_STATUS[idx - 1].emoji} Anterior
+                                        </button>
+                                      ) : <div className="flex-1" />}
+                                      {hasNext ? (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); moveStatus(c.id, HR_STATUS[idx + 1].id); }}
+                                          className="flex-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-100 hover:bg-teal-100 transition-all text-right"
+                                        >
+                                          Próximo {HR_STATUS[idx + 1].emoji} »
+                                        </button>
+                                      ) : <div className="flex-1" />}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                           );
@@ -2137,58 +2073,79 @@ const App = () => {
       {/* ════ MODAL DE FOTO DO PRODUTO (Divulgação) ════ */}
       {photoModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setPhotoModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="font-bold text-lg flex items-center gap-2"><Camera className="w-5 h-5" /> Foto do Produto</h3>
-              <button onClick={() => setPhotoModal(null)} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 flex flex-col md:flex-row">
+
+            {/* Painel Esquerdo: preview da mídia */}
+            <div className="w-full md:w-1/2 bg-gray-50 flex flex-col items-center justify-center p-6 border-b md:border-b-0 md:border-r border-gray-200">
+              {(() => {
+                // Unifica directUrl e driveUrl: tenta extrair file ID de ambos
+                const rawUrl = photoModal.directUrl || photoModal.driveUrl || '';
+                const driveMatch = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                const imgSrc = driveMatch
+                  ? `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1000`
+                  : rawUrl || null;
+
+                if (imgSrc) {
+                  return (
+                    <div className="w-full flex flex-col items-center">
+                      <img
+                        src={imgSrc}
+                        alt="preview"
+                        className="w-full aspect-[3/4] object-cover rounded-xl shadow-md"
+                        onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
+                      />
+                      {/* fallback caso a img não carregue */}
+                      <div style={{ display: 'none' }} className="w-full aspect-[3/4] rounded-xl border-dashed border-2 border-gray-300 bg-gray-100/50 flex flex-col items-center justify-center text-gray-400">
+                        <Camera className="w-12 h-12 mb-3 text-gray-300" />
+                        <span className="text-sm font-bold">Sem Mídia</span>
+                      </div>
+                      <button type="button" onClick={() => window.open(rawUrl, '_blank', 'noopener')} className="mt-4 text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-indigo-600 hover:text-indigo-800 font-bold shadow-sm flex items-center gap-2 transition-all">🔗 Abrir Original</button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="w-full aspect-[3/4] rounded-xl border-dashed border-2 border-gray-300 bg-gray-100/50 flex flex-col items-center justify-center text-gray-400">
+                    <Camera className="w-12 h-12 mb-3 text-gray-300" />
+                    <span className="text-sm font-bold">Sem Mídia</span>
+                  </div>
+                );
+              })()}
             </div>
-            <div className="p-6 space-y-4">
-              {/* Preview */}
-              {photoModal.currentUrl && getGDriveThumbnail(photoModal.currentUrl) && (
-                <div className="flex justify-center">
-                  <img
-                    src={getGDriveThumbnail(photoModal.currentUrl)}
-                    alt="preview"
-                    className="w-40 h-40 object-cover rounded-xl border border-gray-200 shadow-sm"
-                    onError={e => { e.target.style.display = 'none'; }}
-                  />
+
+            {/* Painel Direito: Superfície Lógica */}
+            <div className="w-full md:w-1/2 flex flex-col bg-white">
+              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-4 flex items-center justify-between shadow-sm">
+                <h3 className="font-bold text-lg flex items-center gap-2"><Camera className="w-5 h-5" /> Ficha de Mídia</h3>
+                <button onClick={() => setPhotoModal(null)} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="p-6 flex-1 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 flex items-center gap-1">📸 URL de Imagem Direta</label>
+                  <input type="text" value={photoModal.directUrl || ''} onChange={e => setPhotoModal(p => ({ ...p, directUrl: e.target.value }))} placeholder="https://site.com/imagem.jpg — Links do Google Drive são convertidos automaticamente ✨" className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none" autoFocus />
                 </div>
-              )}
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 flex items-center gap-1">📁 Pasta do Drive</label>
+                  <input type="text" value={photoModal.driveUrl || ''} onChange={e => setPhotoModal(p => ({ ...p, driveUrl: e.target.value }))} placeholder="https://drive.google.com/..." className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none" />
+                </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-600 uppercase mb-2 block">🔗 Link do Google Drive ou URL da imagem</label>
-                <input
-                  type="url"
-                  value={photoModal.currentUrl || ''}
-                  onChange={e => setPhotoModal(p => ({ ...p, currentUrl: e.target.value }))}
-                  placeholder="https://drive.google.com/file/d/…/view"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                  autoFocus
-                />
-              </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-2 space-y-4 shadow-inner">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase mb-1">Informação do Fabricante</label>
+                    <input type="text" value={photoModal.fabricante || ''} onChange={e => setPhotoModal(p => ({ ...p, fabricante: e.target.value }))} placeholder="Fábrica, SKU original, preço custo..." className="w-full border border-gray-300 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase mb-1">Legenda do Modelo (Draft)</label>
+                    <textarea value={photoModal.legenda || ''} onChange={e => setPhotoModal(p => ({ ...p, legenda: e.target.value }))} rows={4} placeholder="Escreva a legenda que irá para o post..." className="w-full border border-gray-300 bg-white rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 outline-none resize-none" />
+                  </div>
+                </div>
 
-              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 space-y-1">
-                <div className="font-bold">Como usar o Google Drive:</div>
-                <div>1. Carregue a foto no Drive</div>
-                <div>2. Clique com botão direito → <strong>Compartilhar → Qualquer pessoa com o link</strong></div>
-                <div>3. Copie o link e cole aqui</div>
-              </div>
-
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => savePhotoUrl(photoModal.key, photoModal.storeId, photoModal.currentUrl)}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-all"
-                >
-                  Salvar Foto
-                </button>
-                {photoModal.currentUrl && (
-                  <button
-                    onClick={() => savePhotoUrl(photoModal.key, photoModal.storeId, '')}
-                    className="px-4 py-2.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 font-medium transition-all text-sm"
-                  >
-                    Remover
-                  </button>
-                )}
+                <div className="flex gap-3 pt-4 mt-auto border-t border-gray-100">
+                  <button onClick={() => savePhotoUrl(photoModal.key, photoModal.storeId, JSON.stringify({ image: photoModal.directUrl || '', folder: photoModal.driveUrl || '', legenda: photoModal.legenda || '', fabricante: photoModal.fabricante || '' }))} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md">Salvar Ficha</button>
+                  {(photoModal.directUrl || photoModal.driveUrl) && (
+                    <button onClick={() => savePhotoUrl(photoModal.key, photoModal.storeId, '')} className="px-4 py-2.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 font-medium transition-all text-sm">Remover</button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { PieChart, Printer, DollarSign, Calculator, Calculator as CalculatorIcon, ArrowRight, Save, BarChart3, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCurrency, getMonthName } from '../utils/formatters';
 
@@ -17,14 +17,51 @@ export function Financeiro({
   dreValues,
   updateDreKey,
   getGoalsData,
-  getHistoricalDataForStorePeriod
+  getHistoricalDataForStorePeriod,
+  saveDreScenario,
+  loadDreScenario,
 }) {
   if (!STORE_CONFIGS) return <div className="p-8 text-gray-400 text-center animate-pulse">Carregando Módulo (Configs)...</div>;
+  const [saveToast, setSaveToast] = useState(null); // null | 'saving' | 'saved' | 'error'
+
   const finData = getFinancialData(selectedStore, selectedMonth, selectedYear);
   if (!finData || !finData.config) return <div className="p-8 text-gray-400 text-center animate-pulse">Carregando DRE...</div>;
   const goalsData = getGoalsData(selectedStore, selectedMonth);
   const currentData = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
   const totalSalesMonth = currentData.reduce((acc, curr) => acc + curr.totalSales, 0);
+
+  const getPrevious12Months = useCallback((m, y) => {
+    const periods = [];
+    let date = new Date(y, m - 1, 1);
+    for (let i = 0; i < 12; i++) {
+      date.setMonth(date.getMonth() - 1);
+      const strYear = date.getFullYear();
+      const strMonth = String(date.getMonth() + 1).padStart(2, '0');
+      periods.push(`${strYear}-${strMonth}`);
+    }
+    return periods;
+  }, []);
+
+  const periodList = useMemo(() => getPrevious12Months(selectedMonth, selectedYear), [selectedMonth, selectedYear, getPrevious12Months]);
+  
+  const rbt12 = useMemo(() => {
+    if (!salesHistory) return 0;
+    return salesHistory
+      .filter(s => (s.store_id || s.storeId || s.storeCode) === selectedStore && periodList.includes(s.period))
+      .reduce((acc, curr) => acc + (Number(curr.totalSales) || 0), 0);
+  }, [salesHistory, selectedStore, periodList]);
+
+  const calcAliquotaSimples = (rbt) => {
+    if (rbt <= 0) return 0.04;
+    if (rbt <= 180000) return 0.04;
+    if (rbt <= 360000) return ((rbt * 0.073) - 5940) / rbt;
+    if (rbt <= 720000) return ((rbt * 0.095) - 13860) / rbt;
+    if (rbt <= 1800000) return ((rbt * 0.107) - 22500) / rbt;
+    if (rbt <= 3600000) return ((rbt * 0.143) - 87300) / rbt;
+    return ((rbt * 0.19) - 378000) / rbt;
+  };
+
+  const percImpostosCalculado = parseFloat((calcAliquotaSimples(rbt12) * 100).toFixed(2));
 
   const dreKeyBase = `${selectedStore}-${selectedMonth}-${selectedYear}-base`;
   const dreKey = `${selectedStore}-${selectedMonth}-${selectedYear}-${dreScenario}`;
@@ -41,6 +78,47 @@ export function Financeiro({
     updateDreKey(dreKey, field, value);
   };
 
+  // ── Auto-Load: quando muda loja/mês/ano, busca cenário salvo ──
+  const period = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  useEffect(() => {
+    if (!loadDreScenario) return;
+    loadDreScenario(selectedStore, period).then(saved => {
+      if (!saved) return;
+      // Aplica cada campo salvo via updateDreKey para o cenário base
+      Object.entries(saved).forEach(([field, value]) => {
+        updateDreKey(`${selectedStore}-${selectedMonth}-${selectedYear}-base`, field, value);
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStore, selectedMonth, selectedYear]);
+
+  const handleSaveDreScenario = useCallback(async () => {
+    if (!saveDreScenario) return;
+    setSaveToast('saving');
+    const dreData = {
+      aluguel: resolveField('aluguel', finData.config.fixedCosts.aluguel),
+      proLabore: resolveField('proLabore', finData.config.fixedCosts.proLabore),
+      agua: resolveField('agua', finData.config.fixedCosts.agua),
+      luz: resolveField('luz', finData.config.fixedCosts.luz),
+      internet: resolveField('internet', finData.config.fixedCosts.internet),
+      software: resolveField('software', finData.config.fixedCosts.software),
+      contabilidade: resolveField('contabilidade', finData.config.fixedCosts.contabilidade),
+      salarios: resolveField('salarios', finData.config.fixedCosts.colaboradoras),
+      administracao: resolveField('administracao', finData.config.fixedCosts.adm),
+      alimentacao: resolveField('alimentacao', finData.config.fixedCosts.alimentacao),
+      transporte: resolveField('transporte', finData.config.fixedCosts.transporte),
+      percCMV: resolveField('percCMV', finData.config.variableCosts.cmv),
+      percImpostos: resolveField('percImpostos', percImpostosCalculado),
+      percTaxasCartao: resolveField('percTaxasCartao', finData.config.variableCosts.taxaCartao),
+      percEmbalagens: resolveField('percEmbalagens', finData.config.variableCosts.embalagem),
+      percObsolescencia: resolveField('percObsolescencia', finData.config.variableCosts.obsoleto),
+    };
+    const ok = await saveDreScenario(selectedStore, period, dreData);
+    setSaveToast(ok ? 'saved' : 'error');
+    setTimeout(() => setSaveToast(null), 3000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveDreScenario, selectedStore, selectedMonth, selectedYear, dreValues]);
+
 
   const receitaBrutaBase = totalSalesMonth;
   // Para cenários otimista/pessimista: se não há valor salvo, herda base (ou 0 explícito se base também for 0)
@@ -52,7 +130,7 @@ export function Financeiro({
   const receitaBruta = dreScenario === 'base' ? receitaBrutaBase : receitaBrutaEdit;
 
   const percCMV = resolveField('percCMV', finData.config.variableCosts.cmv);
-  const percImpostos = resolveField('percImpostos', finData.config.variableCosts.imposto);
+  const percImpostos = resolveField('percImpostos', percImpostosCalculado);
   const percTaxasCartao = resolveField('percTaxasCartao', finData.config.variableCosts.taxaCartao);
   const percEmbalagens = resolveField('percEmbalagens', finData.config.variableCosts.embalagem);
   const percObsolescencia = resolveField('percObsolescencia', finData.config.variableCosts.obsoleto);
@@ -130,7 +208,7 @@ export function Financeiro({
         <div className="flex flex-wrap gap-3 mb-5">
           <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Object.entries(STORE_CONFIGS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}</select>
           <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>)}</select>
-          <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 5 }, (_, i) => <option key={i} value={2023 + i}>{2023 + i}</option>)}</select>
+          <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="border border-emerald-200 p-2.5 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none">{Array.from({ length: 7 }, (_, i) => <option key={i} value={2021 + i}>{2021 + i}</option>)}</select>
         </div>
         <div className="flex flex-wrap gap-3">
           {SCENARIOS.map(({ id, label, activeClass, hoverClass, description }) => (
@@ -210,7 +288,7 @@ export function Financeiro({
             <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Impostos e Deduções Diretas:</div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                ['Impostos', 'percImpostos', impostos, finData.config.variableCosts.imposto],
+                ['Impostos (Dinâmico)', 'percImpostos', impostos, percImpostosCalculado],
                 ['Taxas Cartão', 'percTaxasCartao', taxasCartao, finData.config.variableCosts.taxaCartao],
               ].map(([label, field, val, defaultVal]) => (
                 <div key={field} className="bg-orange-50 p-3 rounded-lg border border-orange-200">
@@ -222,7 +300,23 @@ export function Financeiro({
                 </div>
               ))}
             </div>
-            <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg border border-orange-300"><span className="font-bold text-orange-900">Total Deduções</span><span className="font-bold text-xl text-orange-900">{formatCurrency(deducoesReceita)}</span></div>
+            <details className="mt-2 text-xs group cursor-pointer border border-orange-200 rounded-lg bg-orange-50/50 overflow-hidden text-orange-900 transition-all">
+              <summary className="font-semibold p-2 select-none hover:bg-orange-100 flex items-center justify-between">
+                🧠 Como chegamos nesta Alíquota de Imposto?
+                <span className="text-orange-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="p-3 border-t border-orange-200 bg-white/50 space-y-1.5 opacity-90 font-mono">
+                <div>O Simples Nacional (Anexo I) exige o cálculo do <strong className="text-orange-700">RBT12</strong> (Receita Bruta dos 12 meses anteriores).</div>
+                <div className="pt-1 text-orange-800">1. Somamos as vendas da loja de <span className="font-bold">{periodList[11]} a {periodList[0]}</span> = <strong>R$ {(rbt12).toLocaleString('pt-BR')}</strong></div>
+                <div className="text-orange-800">2. Mapeamos esse RBT12 na tabela do Governo para achar a Alíquota Nominal e a Parcela a Deduzir.</div>
+                <div className="text-orange-800">3. Fórmula Efetiva: <code>((RBT12 * Alíq. Nominal) - Dedução) / RBT12</code></div>
+                <div className="pt-1 mt-1 border-t border-orange-100 font-bold text-orange-700">Resultado: {percImpostosCalculado}% de imposto aplicado na DRE.</div>
+              </div>
+            </details>
+            <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg border border-orange-300">
+                <span className="font-bold text-orange-900">Total Deduções</span>
+                <span className="font-bold text-xl text-orange-900">{formatCurrency(deducoesReceita)}</span>
+            </div>
           </div>
           <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white p-5 rounded-xl shadow-md">
             <div className="flex justify-between items-center"><div><div className="font-bold text-lg">2. Receita Líquida</div><div className="text-sm opacity-90">= Receita Bruta − Impostos · Margem: {margemLiquida.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(receitaLiquida)}</span></div>
@@ -252,7 +346,26 @@ export function Financeiro({
             <div className="flex justify-between items-center"><div><div className="font-bold text-lg">3. Margem de Contribuição</div><div className="text-sm opacity-90">= Rec. Líquida − Variáveis · Margem: {percMargemContribuicao.toFixed(2)}%</div></div><span className="font-bold text-3xl">{formatCurrency(margemContribuicao)}</span></div>
           </div>
           <div className="ml-6 space-y-3">
-            <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Despesas Operacionais Fixas:</div>
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-gray-700 text-sm uppercase tracking-wide">(-) Despesas Operacionais Fixas:</div>
+              {/* Botão Salvar Cenário */}
+              <button
+                onClick={handleSaveDreScenario}
+                disabled={saveToast === 'saving'}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold shadow-sm border transition-all ${
+                  saveToast === 'saved'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : saveToast === 'error'
+                    ? 'bg-red-500 text-white border-red-500'
+                    : saveToast === 'saving'
+                    ? 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                }`}
+              >
+                <Save className="w-4 h-4" />
+                {saveToast === 'saving' ? 'Salvando...' : saveToast === 'saved' ? '✅ Salvo!' : saveToast === 'error' ? '❌ Erro' : 'Salvar Cenário'}
+              </button>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {[
                 ['Aluguel', 'aluguel', aluguel, finData.config.fixedCosts.aluguel],

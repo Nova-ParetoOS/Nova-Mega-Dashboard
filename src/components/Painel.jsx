@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StatsCard } from './ui/stats-card';
+import MarketingAnalytics from './MarketingAnalytics';
 import { Package, Users, Bookmark, DollarSign, Activity } from 'lucide-react';
 
 const formatCurrency = (value) =>
@@ -73,6 +74,13 @@ export default function Painel({
           className="bg-white"
         />
       </div>
+      {/* Aqui entram os seus gráficos atuais do Painel... */}
+
+      {/* 🚀 NOVO DASHBOARD DE MARKETING 🚀 */}
+      <div className="mt-8">
+        <MarketingAnalytics />
+      </div>
+
     </div>
   );
 }

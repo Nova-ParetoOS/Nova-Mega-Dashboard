@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency, getMonthName } from '../utils/formatters';
 import {
   PieChart, BarChart3, X, TrendingUp, TrendingDown,
@@ -38,30 +38,30 @@ const PREDICTIVE_SCENARIOS = [
     indicatorColor: 'bg-emerald-500',
   },
   {
-    id: 'otimista',
-    label: '🚀 Otimista',
-    sublabel: 'Simulando +10% de receita',
-    multiplier: 1.10,
-    pctLabel: '+10%',
-    activeGradient: 'from-blue-600 to-indigo-700',
-    activeBorder: 'border-blue-500',
-    activeText: 'text-white',
-    inactiveText: 'text-blue-700',
-    inactiveBg: 'bg-blue-50 border-blue-200',
-    indicatorColor: 'bg-blue-500',
-  },
-  {
-    id: 'pessimista',
-    label: '⚠️ Pessimista',
-    sublabel: 'Simulando −20% de receita',
-    multiplier: 0.80,
-    pctLabel: '−20%',
+    id: 'minima',
+    label: '🛡️ Venda Mínima',
+    sublabel: 'Alvo = Break-even (Sobrevivência)',
+    multiplier: null,
+    pctLabel: 'Margem Zero',
     activeGradient: 'from-orange-600 to-orange-700',
     activeBorder: 'border-orange-500',
     activeText: 'text-white',
     inactiveText: 'text-orange-700',
     inactiveBg: 'bg-orange-50 border-orange-200',
     indicatorColor: 'bg-orange-500',
+  },
+  {
+    id: 'crescimento',
+    label: '🚀 Meta Saudável',
+    sublabel: 'Crescimento de +15% sob a Base',
+    multiplier: 1.15,
+    pctLabel: '+15%',
+    activeGradient: 'from-blue-600 to-indigo-700',
+    activeBorder: 'border-blue-500',
+    activeText: 'text-white',
+    inactiveText: 'text-blue-700',
+    inactiveBg: 'bg-blue-50 border-blue-200',
+    indicatorColor: 'bg-blue-500',
   },
 ];
 
@@ -92,6 +92,33 @@ function computeDRE(rawRevenue, multiplier, variableCosts, fixedCosts) {
     margemContrib, percMC,
     totalFixo, resultado, margemResultado,
   };
+}
+
+// ── Motor Tributário ─ Simples Nacional Anexo I (Comércio) ─────────────────
+function getPrev12Months(month, year) {
+  const periods = [];
+  let d = new Date(year, month - 1, 1);
+  for (let i = 0; i < 12; i++) {
+    d.setMonth(d.getMonth() - 1);
+    periods.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return periods;
+}
+
+const SIMPLES_FAIXAS = [
+  { limite: 180000,   nominal: 0.040, deducao: 0,       label: '1ª',  range: 'até R$ 180k'   },
+  { limite: 360000,   nominal: 0.073, deducao: 5940,    label: '2ª',  range: 'R$ 180k–360k'  },
+  { limite: 720000,   nominal: 0.095, deducao: 13860,   label: '3ª',  range: 'R$ 360k–720k'  },
+  { limite: 1800000,  nominal: 0.107, deducao: 22500,   label: '4ª',  range: 'R$ 720k–1,8M'  },
+  { limite: 3600000,  nominal: 0.143, deducao: 87300,   label: '5ª',  range: 'R$ 1,8M–3,6M'  },
+  { limite: 4800000,  nominal: 0.190, deducao: 378000,  label: '6ª',  range: 'R$ 3,6M–4,8M'  },
+];
+
+function calcSimplesNacional(rbt12) {
+  if (rbt12 <= 0) return { aliquotaEfetiva: 0.04, faixa: SIMPLES_FAIXAS[0], rbt12: 0 };
+  const faixa = SIMPLES_FAIXAS.find(f => rbt12 <= f.limite) || SIMPLES_FAIXAS[5];
+  const aliquotaEfetiva = ((rbt12 * faixa.nominal) - faixa.deducao) / rbt12;
+  return { aliquotaEfetiva, faixa, rbt12 };
 }
 
 // ── Small helpers ────────────────────────────────────────────
@@ -136,29 +163,24 @@ export default function Financeiro({
   getFinancialData,
   getGoalsData,
   getHistoricalDataForStorePeriod,
+  // Histórico de vendas — necessário para o Motor RBT12
+  salesHistory = [],
   // Saved DRE overrides (kept for read-only display)
   dreValues = {},
   updateDreKey,
   deleteDreKey,
 }) {
   // ── Local predictive scenario (independent of saved dreValues) ──
-  const [predictiveScenario, setPredictiveScenario] = useState('base');
+  const [predictiveScenario, setPredictiveScenario] = useState('custom');
+  const [sliderMultiplier, setSliderMultiplier] = useState(1.0);
 
-  const activeScenarioCfg = PREDICTIVE_SCENARIOS.find(s => s.id === predictiveScenario);
+  const activeScenarioCfg = PREDICTIVE_SCENARIOS.find(s => s.id === predictiveScenario) || { 
+    id: 'custom', 
+    label: '🕹️ Cenário Dinâmico (Arraste)', 
+    multiplier: sliderMultiplier 
+  };
 
-  // ── Simulador de Imposto (Local State) ─────────────────────────
-  const [impostoInput, setImpostoInput] = useState('');
-  const [taxaCartaoInput, setTaxaCartaoInput] = useState('');
-
-  // Sincroniza os inputs sempre que a loja/período mudar (se finData.config estiver lá)
-  useEffect(() => {
-    if (finData?.config) {
-      setImpostoInput(String(finData.config.variableCosts.imposto));
-      setTaxaCartaoInput(String(finData.config.variableCosts.taxaCartao));
-    }
-  }, [selectedStore, selectedMonth, selectedYear, finData]);
-
-  // ── Compute base financials ──────────────────────────────────
+  // ── Compute base financials (DEVE vir ANTES do useEffect que depende de finData) ──
   const finData = useMemo(
     () => getFinancialData(selectedStore, selectedMonth, selectedYear),
     [selectedStore, selectedMonth, selectedYear]
@@ -169,38 +191,87 @@ export default function Financeiro({
     [selectedStore, selectedMonth]
   );
 
+  // ── Simulador Universal de DRE (Local State) ─────────────────────────
+  const [varInputs, setVarInputs] = useState(null);
+  const [fixInputs, setFixInputs] = useState(null);
+
+  // Sincroniza os inputs sempre que a loja/período mudar (finData já declarado acima)
+  // A alíquota de imposto é substituída pelo valor dinâmico do Motor RBT12
+  useEffect(() => {
+    if (finData?.config) {
+      const periods = getPrev12Months(selectedMonth, selectedYear);
+      const rbt12 = salesHistory
+        .filter(h => String(h.storeCode) === String(selectedStore) && periods.includes(h.period))
+        .reduce((acc, h) => acc + (h.totalSales || 0), 0);
+      const { aliquotaEfetiva } = calcSimplesNacional(rbt12);
+      const aliqPct = parseFloat((aliquotaEfetiva * 100).toFixed(2));
+      setVarInputs({
+        ...finData.config.variableCosts,
+        imposto: aliqPct,   // substitui o valor estático do STORE_CONFIGS pela alíquota efetiva
+      });
+      setFixInputs({ ...finData.config.fixedCosts });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStore, selectedMonth, selectedYear, finData, salesHistory]);
+
+  const handleVarChange = (key, val) => {
+      setVarInputs(prev => ({ ...prev, [key]: val === '' ? 0 : Number(val) }));
+  };
+  
+  const handleFixChange = (key, val) => {
+      setFixInputs(prev => ({ ...prev, [key]: val === '' ? 0 : Number(val) }));
+  };
+
   const rawRevenue = useMemo(() => {
     const history = getHistoricalDataForStorePeriod(selectedStore, selectedMonth, selectedYear);
     return history.reduce((acc, r) => acc + (r.totalSales || 0), 0);
   }, [selectedStore, selectedMonth, selectedYear]);
 
+  // ── Motor RBT12: recalcula ao trocar de loja, mês ou ano ─────────────────
+  const simplesResult = useMemo(() => {
+    const periods = getPrev12Months(selectedMonth, selectedYear);
+    const rbt12 = salesHistory
+      .filter(h => String(h.storeCode) === String(selectedStore) && periods.includes(h.period))
+      .reduce((acc, h) => acc + (h.totalSales || 0), 0);
+    return calcSimplesNacional(rbt12);
+  }, [salesHistory, selectedStore, selectedMonth, selectedYear]);
+
   // ── DRE for each scenario ────────────────────────────────────
   const dres = useMemo(() => {
-    if (!finData?.config) return null;
+    if (!finData?.config || !varInputs || !fixInputs) return null;
 
-    // Use input values Se validos, otherwise fallback to 0 to prevent NaN
-    const valImposto = impostoInput === '' ? 0 : parseFloat(impostoInput);
-    const activeImposto = isNaN(valImposto) ? 0 : valImposto;
-    
-    const valTaxaCartao = taxaCartaoInput === '' ? 0 : parseFloat(taxaCartaoInput);
-    const activeTaxaCartao = isNaN(valTaxaCartao) ? 0 : valTaxaCartao;
+    const res = PREDICTIVE_SCENARIOS.reduce((acc, sc) => {
+      let simulatedRevenue = rawRevenue * (sc.multiplier || 1.0);
+      if (sc.id === 'minima') {
+        simulatedRevenue = finData.breakEven; // breakEven is based on original finData, but this represents target
+      } else if (sc.id === 'crescimento') {
+        simulatedRevenue = finData.breakEven * 1.15;
+      }
 
-    const customVariableCosts = {
-      ...finData.config.variableCosts,
-      imposto: activeImposto,
-      taxaCartao: activeTaxaCartao,
-    };
-
-    return PREDICTIVE_SCENARIOS.reduce((acc, sc) => {
       acc[sc.id] = computeDRE(
-        rawRevenue,
-        sc.multiplier,
-        customVariableCosts,
-        finData.config.fixedCosts,
+        simulatedRevenue,
+        1.0, 
+        varInputs,
+        fixInputs,
       );
+
+      if (sc.id === 'minima') {
+        acc[sc.id].resultado = 0;
+        acc[sc.id].margemResultado = 0;
+      }
+      
       return acc;
     }, {});
-  }, [rawRevenue, finData, impostoInput, taxaCartaoInput]);
+    
+    res['custom'] = computeDRE(
+      rawRevenue * sliderMultiplier,
+      1.0, 
+      varInputs,
+      fixInputs
+    );
+    
+    return res;
+  }, [rawRevenue, finData, varInputs, fixInputs, sliderMultiplier]);
 
   if (!finData?.config || !dres) {
     return (
@@ -270,83 +341,76 @@ export default function Financeiro({
               className="bg-white/10 border border-white/20 text-white text-sm font-bold px-3 py-2 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:outline-none backdrop-blur"
             >
               {Array.from({ length: 5 }, (_, i) => (
-                <option key={i} value={2023 + i} className="text-gray-900">{2023 + i}</option>
+                <option key={i} value={2021 + i} className="text-gray-900">{2021 + i}</option>
               ))}
             </select>
           </div>
         </div>
       </div>
 
-      {/* ── Predictive Scenario Selector ──────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Gauge className="w-4 h-4 text-gray-500" />
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Cenário Preditivo</span>
-          <span className="ml-2 text-xs text-gray-400 font-medium">— Custos fixos imutáveis · apenas receita é simulada</span>
-        </div>
+      {/* ── Predictive Scenario Selector (Slider Interativo) ──────────────────── */}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {PREDICTIVE_SCENARIOS.map(sc => {
-            const scDre = dres[sc.id];
-            const isActive = predictiveScenario === sc.id;
-            const diffVsBase = scDre.resultado - base.resultado;
-            return (
-              <button
-                key={sc.id}
-                onClick={() => setPredictiveScenario(sc.id)}
-                className={`fin-scenario-active text-left p-4 rounded-2xl border-2 flex flex-col gap-2 relative overflow-hidden
-                  ${isActive
-                    ? `bg-gradient-to-br ${sc.activeGradient} ${sc.activeBorder} shadow-lg scale-[1.015]`
-                    : `${sc.inactiveBg} hover:scale-[1.005]`
-                  }`}
-              >
-                {/* Active indicator dot */}
-                {isActive && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-white/60" />
-                )}
-                <div className="flex items-center justify-between">
-                  <span className={`font-black text-sm ${isActive ? 'text-white' : sc.inactiveText}`}>
-                    {sc.label}
-                  </span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full
-                    ${isActive ? 'bg-white/20 text-white' : 'bg-white/80 text-gray-600'}`}>
-                    {sc.pctLabel}
-                  </span>
-                </div>
-                <span className={`text-xs font-medium ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
-                  {sc.sublabel}
-                </span>
-                <div className={`text-lg font-black font-mono ${isActive ? 'text-white' : sc.inactiveText}`}>
-                  {formatCurrency(scDre.resultado)}
-                </div>
-                {sc.id !== 'base' && (
-                  <span className={`text-xs font-bold ${isActive ? 'text-white/80' : ''}`}>
-                    {diffVsBase >= 0 ? '+' : ''}{formatCurrency(diffVsBase)} vs base
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      <div className={`bg-white rounded-2xl border-2 shadow-sm p-6 flex flex-col gap-4 relative overflow-hidden group transition-colors ${active.resultado < 0 ? 'border-red-100/60 shadow-red-500/5' : 'border-indigo-100/60 shadow-indigo-500/5'}`}>
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <TrendingUp className="w-32 h-32" />
         </div>
-
-        {/* Revenue simulation callout */}
-        {predictiveScenario !== 'base' && (
-          <div className={`mt-4 p-4 rounded-xl border flex items-center justify-between flex-wrap gap-3
-            ${predictiveScenario === 'otimista' ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-            <div>
-              <div className={`font-bold text-sm ${predictiveScenario === 'otimista' ? 'text-blue-900' : 'text-orange-900'}`}>
-                Receita Base Real: {formatCurrency(rawRevenue)}
-              </div>
-              <div className={`text-xs mt-0.5 ${predictiveScenario === 'otimista' ? 'text-blue-600' : 'text-orange-600'}`}>
-                Receita Simulada ({activeScenarioCfg.pctLabel}): {formatCurrency(active.receitaBruta)}
-              </div>
-            </div>
-            <div className={`text-2xl font-black font-mono ${predictiveScenario === 'otimista' ? 'text-blue-700' : 'text-orange-700'}`}>
-              {formatCurrency(active.receitaBruta - rawRevenue > 0 ? active.receitaBruta - rawRevenue : rawRevenue - active.receitaBruta)}
-              <span className="text-sm ml-1">{active.receitaBruta >= rawRevenue ? 'a mais' : 'a menos'}</span>
-            </div>
+        <div className="flex items-center justify-between z-10">
+          <div>
+            <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">🕹️ Simulador Dinâmico</h3>
+            <p className="text-xs text-gray-500">Arraste para prever Lucro/Prejuízo instantaneamente com base na receita</p>
           </div>
-        )}
+          <div className={`px-4 py-1.5 rounded-full text-[11px] font-black tracking-widest uppercase transition-colors ${active.resultado < 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              Margem: {(active?.margemResultado || 0).toFixed(2)}%
+          </div>
+        </div>
+        
+        <div className="z-10 mt-2 bg-gray-50/70 p-5 rounded-xl border border-gray-100">
+          <div className="flex justify-between items-end mb-6">
+              <div>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                   Receita Simulada 
+                   <span className={`px-1.5 py-0.5 rounded text-[9px] ${sliderMultiplier === 1 ? 'bg-blue-100 text-blue-700 shadow-sm' : 'bg-indigo-100 text-indigo-700 shadow-sm'}`}>
+                      {sliderMultiplier.toFixed(2)}x
+                   </span>
+                </div>
+                <div className={`text-4xl font-black font-mono tracking-tighter ${active.resultado < 0 ? 'text-red-500' : 'text-emerald-500'} transition-colors`}>
+                    {formatCurrency(active.receitaBruta)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Impacto no Caixa</div>
+                <div className={`text-2xl font-black font-mono tracking-tighter ${active.resultado < 0 ? 'text-red-500' : 'text-emerald-500'} transition-colors`}>
+                    {active.resultado > 0 ? '+' : ''}{formatCurrency(active.resultado)}
+                </div>
+              </div>
+          </div>
+          <input 
+            type="range" 
+            min="0" 
+            max="3" 
+            step="0.05"
+            value={sliderMultiplier}
+            onChange={(e) => {
+                setSliderMultiplier(Number(e.target.value));
+                if(predictiveScenario !== 'custom') setPredictiveScenario('custom');
+            }}
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 outline-none hover:h-4 transition-all"
+          />
+          <div className="flex justify-between items-center text-[10px] sm:text-[11px] font-bold text-gray-400 mt-4 px-1">
+              <span>0x (Zero)</span>
+              <button 
+                  onClick={() => { 
+                      const idealMult = rawRevenue > 0 ? (finData.breakEven / rawRevenue) : 1; 
+                      setSliderMultiplier(idealMult); 
+                      setPredictiveScenario('custom'); 
+                  }}
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:text-indigo-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              >
+                  🎯 Empate: {formatCurrency(finData.breakEven)}
+              </button>
+              <span>3x (Recorde)</span>
+          </div>
+        </div>
       </div>
 
       {/* ── 3 KPI Hero Cards ──────────────────────────────── */}
@@ -368,7 +432,7 @@ export default function Financeiro({
           <div className="mt-4 pt-4 border-t border-white/30 space-y-1">
             <div className="flex justify-between text-sm">
               <span className="opacity-90">Margem:</span>
-              <span className="font-bold">{active.margemResultado.toFixed(2)}%</span>
+              <span className="font-bold">{(active?.margemResultado || 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between text-xs opacity-75">
               <span>Receita Simulada:</span>
@@ -441,7 +505,7 @@ export default function Financeiro({
             </div>
             {predictiveScenario !== 'base' && (
               <div className="text-xs opacity-75 mt-1">
-                Base real: {formatCurrency(rawRevenue)} × {activeScenarioCfg.multiplier.toFixed(2)}
+                Base real: {formatCurrency(rawRevenue)} {activeScenarioCfg.multiplier ? `× ${activeScenarioCfg.multiplier.toFixed(2)}` : '→ Meta de Ponto de Equilíbrio'}
               </div>
             )}
           </div>
@@ -459,8 +523,8 @@ export default function Financeiro({
                      type="number"
                      step="0.01"
                      className="w-16 p-1 text-sm border border-orange-300 rounded text-right text-orange-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
-                     value={impostoInput}
-                     onChange={(e) => setImpostoInput(e.target.value)}
+                     value={varInputs.imposto}
+                     onChange={(e) => handleVarChange('imposto', e.target.value)}
                    />
                    <span className="text-orange-700 font-bold">%</span>
                  </div>
@@ -475,8 +539,8 @@ export default function Financeiro({
                      type="number"
                      step="0.01"
                      className="w-16 p-1 text-sm border border-orange-300 rounded text-right text-orange-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
-                     value={taxaCartaoInput}
-                     onChange={(e) => setTaxaCartaoInput(e.target.value)}
+                     value={varInputs.taxaCartao}
+                     onChange={(e) => handleVarChange('taxaCartao', e.target.value)}
                    />
                    <span className="text-orange-700 font-bold">%</span>
                  </div>
@@ -494,9 +558,15 @@ export default function Financeiro({
             <div className="flex justify-between items-center">
               <div>
                 <div className="font-bold text-base">2. Receita Líquida</div>
-                <div className="text-xs opacity-75">Margem: {active.margemLiquida.toFixed(2)}%</div>
+                <div className="text-xs opacity-75">Margem: {(active?.margemLiquida || 0).toFixed(2)}%</div>
               </div>
-              <span className="font-black text-2xl font-mono">{formatCurrency(active.receitaLiquida)}</span>
+              <input 
+                type="text" 
+                readOnly 
+                disabled 
+                value={formatCurrency(active.receitaLiquida)} 
+                className="font-black text-2xl font-mono bg-cyan-700/50 text-white border border-dashed border-cyan-400 rounded-lg px-4 py-1.5 cursor-not-allowed select-none text-right outline-none min-w-[180px]" 
+              />
             </div>
           </div>
 
@@ -505,13 +575,54 @@ export default function Financeiro({
             <div className="text-xs font-bold text-red-700 uppercase tracking-widest mb-2">
               (−) Custos Variáveis (CMV + Logística)
             </div>
-            {[
-              [`CMV (${finData.config.variableCosts.cmv}%)`, active.cmv],
-              [`Embalagens (${finData.config.variableCosts.embalagem}%)`, active.embalagens],
-              [`Obsolescência (${finData.config.variableCosts.obsoleto}%)`, active.obsolescencia],
-            ].map(([label, val]) => (
-              <MetricRow key={label} label={label} value={val} />
-            ))}
+            <MetricRow
+               label={
+                 <div className="flex items-center gap-2">
+                   <span>CMV</span>
+                   <input
+                     type="number"
+                     step="0.01"
+                     className="w-16 p-1 text-sm border border-red-300 rounded text-right text-red-900 focus:ring-2 focus:ring-red-400 focus:outline-none"
+                     value={varInputs.cmv}
+                     onChange={(e) => handleVarChange('cmv', e.target.value)}
+                   />
+                   <span className="text-red-700 font-bold">%</span>
+                 </div>
+               }
+               value={active.cmv}
+            />
+            <MetricRow
+               label={
+                 <div className="flex items-center gap-2">
+                   <span>Embalagens</span>
+                   <input
+                     type="number"
+                     step="0.01"
+                     className="w-16 p-1 text-sm border border-red-300 rounded text-right text-red-900 focus:ring-2 focus:ring-red-400 focus:outline-none"
+                     value={varInputs.embalagem}
+                     onChange={(e) => handleVarChange('embalagem', e.target.value)}
+                   />
+                   <span className="text-red-700 font-bold">%</span>
+                 </div>
+               }
+               value={active.embalagens}
+            />
+            <MetricRow
+               label={
+                 <div className="flex items-center gap-2">
+                   <span>Obsolescência</span>
+                   <input
+                     type="number"
+                     step="0.01"
+                     className="w-16 p-1 text-sm border border-red-300 rounded text-right text-red-900 focus:ring-2 focus:ring-red-400 focus:outline-none"
+                     value={varInputs.obsoleto}
+                     onChange={(e) => handleVarChange('obsoleto', e.target.value)}
+                   />
+                   <span className="text-red-700 font-bold">%</span>
+                 </div>
+               }
+               value={active.obsolescencia}
+            />
             <div className="flex justify-between pt-2 border-t border-red-200">
               <span className="font-bold text-red-900 text-sm">Total Custos Variáveis</span>
               <span className="font-black font-mono text-red-900">{formatCurrency(active.totalVariavel)}</span>
@@ -523,9 +634,15 @@ export default function Financeiro({
             <div className="flex justify-between items-center">
               <div>
                 <div className="font-bold text-base">3. Margem de Contribuição</div>
-                <div className="text-xs opacity-75">Margem: {active.percMC.toFixed(2)}%</div>
+                <div className="text-xs opacity-75">Margem: {(active?.percMC || 0).toFixed(2)}%</div>
               </div>
-              <span className="font-black text-2xl font-mono">{formatCurrency(active.margemContrib)}</span>
+              <input 
+                type="text" 
+                readOnly 
+                disabled 
+                value={formatCurrency(active.margemContrib)} 
+                className="font-black text-2xl font-mono bg-emerald-700/50 text-white border border-dashed border-emerald-400 rounded-lg px-4 py-1.5 cursor-not-allowed select-none text-right outline-none min-w-[180px]" 
+              />
             </div>
           </div>
 
@@ -537,23 +654,33 @@ export default function Financeiro({
                 Imutáveis nos 3 cenários
               </span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-3">
               {[
-                ['Aluguel', finData.config.fixedCosts.aluguel],
-                ['Pró-labore', finData.config.fixedCosts.proLabore],
-                ['Salários + Encargos', finData.config.fixedCosts.colaboradoras],
-                ['Água', finData.config.fixedCosts.agua],
-                ['Luz', finData.config.fixedCosts.luz],
-                ['Internet', finData.config.fixedCosts.internet],
-                ['Software', finData.config.fixedCosts.software],
-                ['Contabilidade', finData.config.fixedCosts.contabilidade],
-                ['Administração', finData.config.fixedCosts.adm],
-                ['Alimentação', finData.config.fixedCosts.alimentacao],
-                ['Transporte', finData.config.fixedCosts.transporte],
-              ].filter(([, v]) => v > 0).map(([label, val]) => (
-                <div key={label} className="bg-white/60 rounded-lg p-2 border border-purple-100">
-                  <div className="text-[10px] text-purple-600 font-bold uppercase truncate">{label}</div>
-                  <div className="font-bold text-purple-900 text-sm font-mono">{formatCurrency(val)}</div>
+                ['Aluguel', 'aluguel'],
+                ['Pró-labore', 'proLabore'],
+                ['Salários + Enc.', 'colaboradoras'],
+                ['Água', 'agua'],
+                ['Luz', 'luz'],
+                ['Internet', 'internet'],
+                ['Software', 'software'],
+                ['Contabilidade', 'contabilidade'],
+                ['Administração', 'adm'],
+                ['Alimentação', 'alimentacao'],
+                ['Transporte', 'transporte'],
+              ].map(([label, key]) => (
+                <div key={label} className="bg-white/60 rounded-lg p-2 border border-purple-100 flex flex-col gap-1.5 focus-within:ring-1 focus-within:ring-purple-300 transition-shadow">
+                  <div className="text-[10px] text-purple-600 font-bold uppercase truncate px-1">{label}</div>
+                  <div className="flex items-center gap-1 bg-white border border-purple-200 rounded px-1.5 py-1">
+                      <span className="text-xs text-purple-400 font-bold">R$</span>
+                      <input
+                         type="number"
+                         step="10.00"
+                         className="w-full text-sm font-bold text-purple-900 focus:outline-none bg-transparent"
+                         value={fixInputs[key] === 0 ? '' : fixInputs[key]}
+                         placeholder="0.00"
+                         onChange={(e) => handleFixChange(key, e.target.value)}
+                       />
+                  </div>
                 </div>
               ))}
             </div>
@@ -572,12 +699,16 @@ export default function Financeiro({
               <div>
                 <div className="text-lg font-black">4. {resultPos ? 'LUCRO' : 'PREJUÍZO'} LÍQUIDO</div>
                 <div className="text-sm opacity-80 mt-0.5">
-                  Margem: {active.margemResultado.toFixed(2)}% · Cenário {activeScenarioCfg.label}
+                  Margem: {(active?.margemResultado || 0).toFixed(2)}% · Cenário {activeScenarioCfg.label}
                 </div>
               </div>
-              <span className="font-black text-4xl font-mono">
-                {formatCurrency(Math.abs(active.resultado))}
-              </span>
+              <input 
+                type="text" 
+                readOnly 
+                disabled 
+                value={formatCurrency(Math.abs(active.resultado))} 
+                className={`font-black text-4xl font-mono ${resultPos ? 'bg-emerald-800/40 border-emerald-400' : 'bg-red-900/40 border-red-400'} text-white border border-dashed rounded-lg px-5 py-2 cursor-not-allowed select-none text-right outline-none min-w-[200px]`}
+              />
             </div>
           </div>
         </div>
@@ -624,7 +755,7 @@ export default function Financeiro({
                 <th className="text-left py-3 pr-4 text-gray-500 font-bold text-xs uppercase tracking-wide">Indicador</th>
                 {PREDICTIVE_SCENARIOS.map(sc => (
                   <th key={sc.id} className={`text-right py-3 px-4 text-xs font-black uppercase tracking-wide
-                    ${sc.id === 'base' ? 'text-emerald-700' : sc.id === 'otimista' ? 'text-blue-700' : 'text-orange-700'}`}>
+                    ${sc.id === 'base' ? 'text-emerald-700' : sc.id === 'crescimento' ? 'text-blue-700' : 'text-orange-700'}`}>
                     {sc.label}
                   </th>
                 ))}
@@ -648,7 +779,7 @@ export default function Financeiro({
                     return (
                       <td key={sc.id} className={`text-right py-3 px-4 font-mono font-bold text-xs rounded transition-colors
                         ${isActive ? 'bg-emerald-50' : ''}
-                        ${isNeg ? 'text-red-600' : sc.id === 'base' ? 'text-emerald-700' : sc.id === 'otimista' ? 'text-blue-700' : 'text-orange-700'}`}>
+                        ${isNeg ? 'text-red-600' : sc.id === 'base' ? 'text-emerald-700' : sc.id === 'crescimento' ? 'text-blue-700' : 'text-orange-700'}`}>
                         {fmt === '%' ? `${v.toFixed(1)}%` : formatCurrency(v)}
                       </td>
                     );

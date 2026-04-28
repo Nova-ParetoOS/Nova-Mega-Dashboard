@@ -1,22 +1,85 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 // framer-motion removed — CSS transitions used instead
-import { Send, Clock, X, Plus, List, LayoutGrid, Search, Archive, ChevronRight, Calendar, Smartphone, Code2, Eye, ShoppingBag, Trash2, ChevronDown, Tag } from 'lucide-react';
-import { ProjectDashboard } from './ui/project-management-dashboard';
+import { Send, Clock, X, Plus, List, LayoutGrid, Search, Archive, ChevronRight, Calendar, Smartphone, Code2, Eye, ShoppingBag, Trash2, ChevronDown, Tag, MessageCircle, ArrowRight, Copy, Check, BookOpen, Bell } from 'lucide-react';
+const TIPO_CLIENTE_PILLS = {
+    cliente: { label: '👤 Cliente', cls: 'bg-blue-50 text-blue-700 border-blue-100' },
+    vip: { label: '✅ VIP', cls: 'bg-amber-50 text-amber-700 border-amber-100' },
+    b2b: { label: '🏢 Empresa B2B', cls: 'bg-purple-50 text-purple-700 border-purple-100' },
+};
 
-// ─── Pipeline stages ────────────────────────────────────────────
 const STAGES = [
-    { id: 'Triagem', label: 'Triagem', emoji: '📥', pill: 'bg-blue-100 text-blue-700 border border-blue-200', col: 'bg-blue-50 border-blue-100' },
-    { id: 'Sondagem', label: 'Sondagem', emoji: '🔍', pill: 'bg-purple-100 text-purple-700 border border-purple-200', col: 'bg-purple-50 border-purple-100' },
-    { id: 'Visita', label: 'Visita', emoji: '📅', pill: 'bg-indigo-100 text-indigo-700 border border-indigo-200', col: 'bg-indigo-50 border-indigo-100' },
-    { id: 'Fechamento', label: 'Fechamento', emoji: '💰', pill: 'bg-green-100 text-green-700 border border-green-200', col: 'bg-green-50 border-green-100' },
-    { id: 'Ghosting', label: 'Ghosting', emoji: '👻', pill: 'bg-red-100 text-red-700 border border-red-200', col: 'bg-red-50 border-red-100' },
+    { id: 'triagem', label: 'Novo Contato (Triagem)', emoji: '📥', pill: 'bg-blue-100 text-blue-700 border border-blue-200', col: 'bg-blue-50 border-blue-100' },
+    { id: 'atendimento', label: 'Em Atendimento (Enviando fotos)', emoji: '💬', pill: 'bg-amber-100 text-amber-700 border border-amber-200', col: 'bg-amber-50 border-amber-100' },
+    { id: 'pagamento', label: 'Aguardando Pagamento (Link/Pix)', emoji: '⏳', pill: 'bg-purple-100 text-purple-700 border border-purple-200', col: 'bg-purple-50 border-purple-100' },
+    { id: 'fechada', label: 'Venda Fechada (Pago/Separado)', emoji: '✅', pill: 'bg-green-100 text-green-700 border border-green-200', col: 'bg-green-50 border-green-100' },
+    { id: 'perdido', label: 'Perdido / Sem Resposta', emoji: '❌', pill: 'bg-gray-100 text-gray-700 border border-gray-200', col: 'bg-gray-50 border-gray-100' },
 ];
+
+const ATALHOS_WHATSAPP = {
+    Triagem: [
+        { comando: '/Oi', texto: 'Oi! Seja bem-vinda a Mega Jeans! Para eu te atender melhor, como podemos te chamar por aqui?\n\nMe conta:\n1. Qual numeração você busca hoje?\n2. Algum modelo que já usa e gosta (Skinny, Wide Leg, Mom...)?' },
+        { comando: '/TriagemPost', texto: 'Oi! Vi que gostou das novidades. Essas peças saem muito rápido. Qual tamanho você costuma usar? Assim já confiro o estoque agora mesmo e te mando fotos delas no balcão!' },
+        { comando: '/FotoChega', texto: 'Oi, [Nome]! Recebi sua mensagem sim. Tô com a loja cheia nesse momento, mas não vou te deixar esperando!\n\nVou te mandar as fotos do [modelo] em até [X horas] — pode ser?\nSe quiser, já anoto seu tamanho e deixo separado para garantir.' },
+        { comando: '/Estoquebalcao', texto: '[Nome], vou ali no nosso balcão agora mesmo conferir o que temos de mais lindo no seu tamanho.\n\nMe dá só uns minutinhos? Já volto com fotos reais para você ver o caimento.' }
+    ],
+    Apresentacao: [
+        { comando: '/Apresentacaofoto', texto: '[Nome do Modelo]\nEste modelo tem cintura alta e modelagem que valoriza o corpo com conforto.\n- Diferencial: [ex: estica / não laceia]\n- Elastano: x% (estica bem)\n- Tamanhos: [36 a 44]\n\nR$ [Preço] — 3x sem juros.\nQuer que eu separe para você provar?' },
+        { comando: '/DuvidaTamanho', texto: 'Entendo, [Nome]! Cada corpo é diferente. Você prefere mais justo no quadril ou um pouquinho mais folgado?\n\nEsse modelo tem [X]% de elastano, então ele vai adaptar bem. Dica: quadril mais cheio que a cintura? Pega um número acima — fica ótimo!\nSeparo os dois tamanhos para provar?' },
+        { comando: '/Plus', texto: '[Nome], temos modelos Plus Size que são um verdadeiro abraço no corpo! Peças com muito conforto que vestem do 48 ao 54 com muito estilo.\n\nQual numeração você costuma usar? Te mando fotos do caimento real!' }
+    ],
+    Fechamento: [
+        { comando: '/QualificacaoEntrega', texto: 'Perfeito, [Nome]! Para organizar sua entrega, preciso de 4 infos rapidinho:\n\n1. TAMANHO [TAM] confirmado?\n2. ENDEREÇO: rua, número, bairro + ponto de referência\n3. RESPONSÁVEL pelo recebimento: seu nome ou quem estará em casa\n4. PAGAMENTO: Pix ou Cartão?\n\nSobre troca: você tem 15 dias com etiqueta para trocar presencialmente. O motoboy só entrega. Combinado?' },
+        { comando: '/Fechamentototal', texto: 'Tudo pronto, [Nome]!\n\nChave Pix: 17.442.843/0001-40\nCartão: maquineta ou link de pagamento\n\nEntrega: Taxa R$ [Valor]\nRetirada: Grátis — Rua Coronel Teófilo Leme, 1227 - Centro\n\nFico no aguardo do comprovante.' },
+        { comando: '/CodigoEntrega', texto: 'Prontinho, [Nome]! O motoboy já tá a caminho. O código de segurança é: [XXXX]\n\nPassa pra quem for receber, tá? É só para garantir que chegou no lugar certo.\n\nAvisa quando chegar!' }
+    ],
+    Recuperacao: [
+        { comando: '/Ghosting', texto: 'Oi, [Nome]! Tudo certinho? Passando para saber se as fotos do balcão ajudaram ou se ficou alguma dúvida?\n\nComo a procura está grande hoje, queria saber se quer que eu reserve algo ou se libero a peça no estoque?\nFico no seu aguardo.' },
+        { comando: '/CarneAviso', texto: 'Oi, [Nome]! Tudo bem?\nPassando só pra lembrar que a sua parcela de [MÊS] vence dia [DIA].\n\nChave Pix: 17.442.843/0001-40\nValor: R$ [valor]\n\nManda o comprovante aqui! Qualquer dúvida é só chamar.' },
+        { comando: '/VIPAviso', texto: 'Oi, [Nome]! Estamos avisando para você em primeira mão. Acabou de chegar na loja e ainda não postamos nas redes: [foto(s)]\n\nQuer garantir o seu antes que a gente poste? Se quiser me fala que já separo.' }
+    ]
+};
+
+// Roteador Stage -> Categorias de Scripts (CTO v2.2)
+const STAGE_TO_SCRIPTS = {
+    triagem: ['Triagem'],
+    atendimento: ['Apresentacao'],
+    pagamento: ['Fechamento'],
+    fechada: [],
+    perdido: ['Recuperacao'],
+};
 
 const ORIGENS = ['', 'Instagram', 'WhatsApp', 'Indicação', 'Loja Física', 'Outro'];
 
 const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+    // ISO string with timezone: strip time part for display
+    const s = typeof d === 'string' ? d : new Date(d).toISOString();
+    // Parse first 10 chars as YYYY-MM-DD safely with local time
+    const [y, m, day] = s.slice(0, 10).split('-').map(Number);
+    if (!y || !m || !day) return '—';
+    return new Date(y, m - 1, day).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatDateShort = (d) => {
+    if (!d) return '';
+    const s = typeof d === 'string' ? d : new Date(d).toISOString();
+    const [, m, day] = s.slice(0, 10).split('-').map(Number);
+    if (!m || !day) return '';
+    return `${String(day).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+};
+
+// Parse seguro de datas ISO ou DD/MM/YYYY para exibição
+const parseDateSafe = (d) => {
+    if (!d) return '—';
+    // Formato DD/MM/YYYY
+    if (typeof d === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(d.trim())) {
+        const [dd, mm, yyyy] = d.trim().split('/').map(Number);
+        return new Date(yyyy, mm - 1, dd).toLocaleDateString('pt-BR');
+    }
+    // Formato ISO YYYY-MM-DD (evita diff de fuso)
+    const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('pt-BR');
+    return '—';
 };
 
 const daysSince = (d) => {
@@ -24,92 +87,257 @@ const daysSince = (d) => {
     return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 };
 
-// ─── Lead Card (Kanban) ──────────────────────────────────────────
-const LeadCard = ({ lead, stages, onMove, onArchive, onEdit, onDragStart, onDragEnd, isDragging }) => {
-    const dias = daysSince(lead.created_at);
-    const phone = String(lead.telefone || '').replace(/\D/g, '');
-    const stage = stages.find(s => s.id === (lead.status || lead.estagio)) || stages[0];
-    const isTerminal = ['Fechamento', 'Ghosting'].includes(stage.id);
+export const getIdleHours = (lead) => {
+    const refDate = lead.updated_at || lead.created_at;
+    if (!refDate) return 0;
+    const diffMs = Date.now() - new Date(refDate).getTime();
+    return Math.max(0, diffMs / (1000 * 60 * 60));
+};
 
-    const tags = [];
-    if (lead.produto) tags.push({ label: lead.produto, color: 'bg-blue-100 text-blue-700 border-blue-200' });
-    if (lead.marca) tags.push({ label: lead.marca, color: 'bg-indigo-100 text-indigo-700 border-indigo-200' });
-    if (lead.modelo) tags.push({ label: lead.modelo, color: 'bg-purple-100 text-purple-700 border-purple-200' });
-    if (lead.tamanho) tags.push({ label: lead.tamanho, color: 'bg-pink-100 text-pink-700 border-pink-200' });
+const AlertBell = ({ leads }) => {
+    const criticalLeads = leads.filter(l => {
+        const h = getIdleHours(l);
+        return h >= 2 && l.estagio !== 'perdido' && l.estagio !== 'fechada' && l.status !== 'fechada' && l.status !== 'perdido';
+    });
+    const count = criticalLeads.length;
+
+    if (count === 0) return null;
+
+    return (
+        <button
+            className="relative p-2.5 rounded-full bg-white border border-red-100 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm ring-1 ring-red-500/20"
+            title={`${count} leads aguardando há mais de 2 horas!`}
+        >
+            <Bell className="w-4 h-4 animate-bounce" />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow ring-2 ring-white">
+                {count}
+            </span>
+        </button>
+    );
+};
+
+// ─── Playbook Tab (Subcomponente Interno) ─────────────────────────
+const PlaybookTab = ({ readOnly = false }) => {
+    const [pNome, setPNome] = useState('');
+    const [pModelo, setPModelo] = useState('');
+    const [pTamanho, setPTamanho] = useState('');
+    const [copiedAtalho, setCopiedAtalho] = useState(null);
+    const [openCategoria, setOpenCategoria] = useState('Triagem');
+
+    const handleCopy = (texto, comando) => {
+        const msg = texto
+            .replace(/\[Nome\]/gi, pNome.trim() || 'Cliente')
+            .replace(/\[modelo\]|\[Modelo\]/g, pModelo.trim() || 'modelo')
+            .replace(/\[Tamanho\]/gi, pTamanho.trim() || 'tamanho');
+        navigator.clipboard.writeText(msg);
+        setCopiedAtalho(comando);
+        setTimeout(() => setCopiedAtalho(null), 2000);
+    };
+
+    return (
+        <div className={`flex h-full w-full overflow-y-auto bg-gray-50/50 ${readOnly ? 'flex-col p-4 gap-4' : 'flex-col md:flex-row p-6 gap-6'}`}>
+            {/* Esquerda: Regras e Fluxos */}
+            <div className={`w-full flex-col gap-4 ${readOnly ? 'flex' : 'md:w-1/3 flex'}`}>
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3"><BookOpen className="w-5 h-5 text-indigo-500" /> Regras de Ouro</h3>
+                    <ul className="text-sm text-gray-600 space-y-2">
+                        <li className="flex items-start gap-2"><b>1.</b> <span className="pt-0.5">Sempre chame a cliente pelo nome (cria conexão).</span></li>
+                        <li className="flex items-start gap-2"><b>2.</b> <span className="pt-0.5">Envie fotos reais (corpo/manequim), fuja só da foto de cabide.</span></li>
+                        <li className="flex items-start gap-2"><b>3.</b> <span className="pt-0.5">Termine a frase com uma pergunta para não matar o assunto.</span></li>
+                    </ul>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3"><X className="w-5 h-5 text-red-500" /> Os 3 Erros Mortais</h3>
+                    <ul className="text-sm text-red-700/80 space-y-2">
+                        <li className="flex items-start gap-2"><b>1.</b> <span className="pt-0.5">Demorar mais de 30 min sem avisar (gera frustração).</span></li>
+                        <li className="flex items-start gap-2"><b>2.</b> <span className="pt-0.5">Mandar foto de peça sem informar o preço logo de cara.</span></li>
+                        <li className="flex items-start gap-2"><b>3.</b> <span className="pt-0.5">Ignorar o cliente caso diga que "só estava olhando".</span></li>
+                    </ul>
+                </div>
+                {readOnly && (
+                    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mt-2">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3"><BookOpen className="w-5 h-5 text-indigo-500" /> Os 7 Fluxos de Atendimento</h3>
+                        <ul className="text-sm text-gray-600 space-y-3">
+                            <li className="flex flex-col"><b>Fluxo 1 (Nova Lead)</b><span className="text-xs text-gray-400">Insta/Cakebot → Resp. 2h → Tag: Novo Lead</span></li>
+                            <li className="flex flex-col"><b>Fluxo 2 (Pedido Direto)</b><span className="text-xs text-gray-400">Sabe o que quer → Tag: Em Atendimento → Módulo Core</span></li>
+                            <li className="flex flex-col"><b>Fluxo 3 (Foto Pendente)</b><span className="text-xs text-gray-400">Causa abandono → /FotoChega em 30min</span></li>
+                            <li className="flex flex-col"><b>Fluxo 4 (Delivery)</b><span className="text-xs text-gray-400">Quer entrega em casa → Enviar /QualificacaoEntrega</span></li>
+                            <li className="flex flex-col"><b>Fluxo 5 (Plus Size)</b><span className="text-xs text-gray-400">Tamanho 46+ → Tom acolhedor → Tag: Plus Size</span></li>
+                            <li className="flex flex-col"><b>Fluxo 6 (Carnê / VIP)</b><span className="text-xs text-gray-400">Lembrete amigável 3 dias antes ou Aviso 3ª compra</span></li>
+                            <li className="flex flex-col"><b>Fluxo 7 (Outra Cidade)</b><span className="text-xs text-gray-400">Nunca dizer "não podemos" → Enviar endereços</span></li>
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {/* Direita: Gerador Interativo */}
+            <div className={`w-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-1 ${readOnly ? 'min-h-[300px]' : 'md:w-2/3 max-h-[85vh]'}`}>
+                {!readOnly && (
+                    <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-transparent">
+                        <h2 className="text-lg font-bold text-blue-900 mb-1">⚡ Gerador de Mensagens Rápidas</h2>
+                        <p className="text-sm text-gray-500 mb-4">Preencha os campos abaixo para substituir as tags automaticamente nos textos.</p>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            <input type="text" placeholder="Nome (ex: Maria)" value={pNome} onChange={(e) => setPNome(e.target.value)} className="w-full text-sm font-medium border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 bg-white" />
+                            <input type="text" placeholder="Modelo (ex: Wide Leg)" value={pModelo} onChange={(e) => setPModelo(e.target.value)} className="w-full text-sm font-medium border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 bg-white" />
+                            <input type="text" placeholder="Tamanho (ex: 42)" value={pTamanho} onChange={(e) => setPTamanho(e.target.value)} className="w-full text-sm font-medium border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 bg-white" />
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
+                    {Object.entries(ATALHOS_WHATSAPP).map(([categoria, atalhos]) => (
+                        <div key={categoria} className="bg-white border text-gray-800 rounded-xl overflow-hidden shadow-sm">
+                            <button
+                                onClick={() => setOpenCategoria(openCategoria === categoria ? null : categoria)}
+                                className="w-full p-4 flex justify-between items-center text-left font-bold text-sm bg-gray-50 hover:bg-gray-100 transition-colors"
+                            >
+                                <span>{categoria} ({atalhos.length} atalhos)</span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openCategoria === categoria ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openCategoria === categoria && (
+                                <div className="p-4 space-y-3">
+                                    {atalhos.map((a) => (
+                                        <div key={a.comando} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 relative group pr-16 bg-blue-50/20">
+                                            <span className="text-xs font-bold text-blue-600 bg-blue-100 w-fit px-2 py-0.5 rounded-full">{a.comando}</span>
+                                            <p className="text-[13px] text-gray-700 italic border-l-2 border-blue-200 pl-2">
+                                                "{a.texto}"
+                                            </p>
+                                            {!readOnly && (
+                                                <button
+                                                    onClick={() => handleCopy(a.texto, a.comando)}
+                                                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl border shadow-sm transition-all flex flex-col items-center justify-center gap-1 min-w-[70px] ${copiedAtalho === a.comando
+                                                        ? 'bg-emerald-50 tex-emerald-700 border-emerald-200'
+                                                        : 'bg-white text-gray-500 border-gray-200 hover:text-blue-600 hover:border-blue-300 hover:shadow'
+                                                        }`}
+                                                >
+                                                    {copiedAtalho === a.comando ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                                                    <span className={`text-[9px] font-bold ${copiedAtalho === a.comando ? 'text-emerald-700' : ''}`}>
+                                                        {copiedAtalho === a.comando ? 'Copiado!' : 'Copiar'}
+                                                    </span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Lead Card (Kanban) ──────────────────────────────────────────
+const LeadCard = ({ lead, stages, onMove, onArchive, onEdit, onDragStart, onDragEnd, isDragging, onScriptOpen }) => {
+    const phone = String(lead.telefone || '').replace(/\D/g, '');
+    const stageId = lead.status || lead.estagio;
+    const stage = stages.find(s => s.id === stageId) || stages[0];
+    const currentIndex = stages.findIndex(s => s.id === stage.id);
+    const prevStage = currentIndex > 0 ? stages[currentIndex - 1] : null;
+    const nextStage = currentIndex < stages.length - 1 ? stages[currentIndex + 1] : null;
+
+    const tipoKey = lead.tipo_cliente || '';
+    const pill = TIPO_CLIENTE_PILLS[tipoKey];
+
+    const idleHours = getIdleHours(lead);
+    let idleClasses = 'border-gray-200 hover:border-indigo-300';
+    let zumbiMode = false;
+    if (idleHours >= 48) {
+        zumbiMode = true;
+        idleClasses = 'border-gray-400 bg-gray-100 opacity-75 grayscale';
+    } else if (idleHours >= 24) {
+        idleClasses = 'border-red-500 animate-[pulse_2s_ease-in-out_infinite] bg-red-50/20 border-2';
+    } else if (idleHours >= 2) {
+        idleClasses = 'border-orange-400 bg-orange-50/10 border-2';
+    }
 
     return (
         <div
             draggable
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
-            className={`bg-white rounded-xl border shadow-sm transition-all duration-200 group cursor-grab active:cursor-grabbing relative overflow-hidden
-              hover:-translate-y-1 hover:shadow-lg hover:border-indigo-300 hover:ring-2 hover:ring-indigo-100
-              ${isDragging ? 'opacity-50 scale-95 ring-2 ring-indigo-400' : 'border-gray-100'}`}
+            className={`bg-white rounded-xl border shadow-sm transition-all duration-200 group cursor-grab active:cursor-grabbing relative overflow-hidden flex flex-col justify-between hover:-translate-y-1 hover:shadow-lg ${idleClasses} ${isDragging ? 'opacity-50 scale-95 ring-2 ring-indigo-400' : ''}`}
         >
-            {/* Stage color accent bar */}
-            <div className={`h-0.5 w-full ${stage.id === 'Ghosting' ? 'bg-red-400' : stage.id === 'Fechamento' ? 'bg-green-400' : stage.id === 'Visita' ? 'bg-indigo-400' : stage.id === 'Sondagem' ? 'bg-purple-400' : 'bg-blue-400'}`} />
-            {/* Info principal — sempre visível */}
-            <div className="p-3">
-                <div className="flex items-start justify-between gap-1 mb-2">
-                    <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm text-gray-900 leading-tight">{lead.nome || lead.name}</div>
-                        {lead.origem && (
-                            <div className="text-[10px] text-indigo-600 font-bold mt-0.5 tracking-wide uppercase">{lead.origem}</div>
-                        )}
-                    </div>
-                    <button onClick={() => onEdit(lead)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-gray-600 p-0.5 bg-gray-50 rounded-md">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                    </button>
+            {zumbiMode && (
+                <div className="bg-gray-800 text-white text-[10px] font-bold text-center py-1 flex items-center justify-center gap-1">
+                    🚨 48H+ (ARQUIVE O CARD)
                 </div>
-
-                {/* Tags Notion Style */}
-                {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2.5">
-                        {tags.map((t, idx) => (
-                            <span key={idx} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${t.color}`}>
-                                {t.label}
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                {/* Badge de tempo */}
-                {dias !== null && (
-                    <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 mb-2">
-                        <Clock className="w-2.5 h-2.5" /> {dias}d
-                    </div>
-                )}
-
-                {/* WhatsApp — sempre visível */}
-                {phone.length >= 8 && (
-                    <a href={`https://wa.me/55${phone}`} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold w-full justify-center transition-all shadow-sm">
-                        <Send className="w-3 h-3" /> WhatsApp
-                    </a>
+            )}
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onScriptOpen && onScriptOpen(lead); }}
+                    className="text-amber-400 hover:text-amber-600 p-1.5 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-transparent hover:border-amber-200"
+                    title="Ver scripts para este lead"
+                >
+                    <span className="text-xs font-black leading-none">⚡</span>
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(lead); }}
+                    className="text-gray-400 hover:text-indigo-600 p-1.5 bg-gray-50 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                    title="Editar"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </button>
+                {onArchive && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}
+                        className="text-gray-400 hover:text-red-500 p-1.5 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                        title="Deletar/Arquivar"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 )}
             </div>
 
-            {/* Ações — apenas no hover */}
-            <div className="overflow-hidden max-h-0 group-hover:max-h-64 transition-all duration-200 ease-in-out border-t border-gray-50 group-hover:border-gray-100">
-                <div className="p-2.5 pt-2 space-y-2">
-                    {/* Mover stage */}
-                    <div className="flex flex-wrap gap-1">
-                        {stages.filter(s => s.id !== stage.id).map(s => (
-                            <button key={s.id} onClick={() => onMove(lead.id, s.id)}
-                                className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-indigo-300 hover:text-indigo-700 hover:bg-indigo-50 transition-all">
-                                → {s.emoji} {s.label}
-                            </button>
-                        ))}
+            <div className="p-3 flex flex-col h-full items-start">
+                <div className="font-bold text-sm text-gray-900 leading-tight mb-1 pr-12 w-full truncate" title={lead.nome || lead.name}>{lead.nome || lead.name}</div>
+
+                {(lead.produto || lead.marca || lead.modelo) && (
+                    <div className="text-[11px] font-semibold text-gray-600 mb-2 line-clamp-2 leading-tight">
+                        🛒 {[lead.produto, lead.marca, lead.modelo, lead.tamanho].filter(Boolean).join(' · ')}
                     </div>
-                    {isTerminal && onArchive && (
-                        <button onClick={() => onArchive(lead.id)}
-                            className="w-full text-[10px] uppercase font-bold px-2 py-1 rounded-lg border border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5">
-                            <Archive className="w-3 h-3" /> Arquivar
-                        </button>
-                    )}
+                )}
+
+                {pill && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border mb-1 inline-block ${pill.cls}`}>
+                        {pill.label}
+                    </span>
+                )}
+
+                <div className="flex items-center gap-1.5 text-[10px] items-baseline font-mono text-gray-400 mb-2 mt-auto pt-2 w-full">
+                    {phone.length >= 8 ? (
+                        <a href={`https://wa.me/55${phone}`} target="_blank" rel="noreferrer" className="hover:text-green-500 transition-colors flex items-center gap-1 font-bold w-full">
+                            <MessageCircle className="w-3 h-3 text-green-500" /> {lead.telefone || phone}
+                        </a>
+                    ) : <span>Sem contato</span>}
                 </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-100/60 p-2 pt-1 flex flex-col gap-1">
+                <div className="flex gap-1.5 w-full">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); if (prevStage) onMove(lead.id, prevStage.id); }}
+                        disabled={!prevStage}
+                        className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border transition-all flex items-center justify-center ${prevStage ? 'border-gray-200 text-gray-500 hover:border-indigo-300 hover:text-indigo-700 bg-white shadow-sm' : 'border-transparent text-gray-300 bg-transparent cursor-not-allowed opacity-50'}`}>
+                        <ChevronRight className="w-3 h-3 rotate-180" /> Anterior
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); if (nextStage) onMove(lead.id, nextStage.id); }}
+                        disabled={!nextStage}
+                        className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border transition-all flex items-center justify-center gap-0.5 ${nextStage ? 'border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-700 bg-white shadow-sm' : 'border-transparent text-gray-300 bg-transparent cursor-not-allowed opacity-50'}`}>
+                        Próximo <ChevronRight className="w-3 h-3" />
+                    </button>
+                </div>
+                {lead.created_at && (
+                    <div className="w-full text-center group-hover:opacity-100 opacity-60 transition-opacity">
+                        <span className="text-[9px] text-gray-400 font-medium">Criado em: <span className="font-bold">{formatDateShort(lead.created_at)}</span></span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -220,16 +448,13 @@ const MermaidSection = () => {
 
 // ─── Encomendas ────────────────────────────────────────────────────
 const STATUS_PILLS = {
-    waiting: { label: 'Aguardando Chegada', cls: 'bg-amber-100 text-amber-700 border border-amber-200' },
-    available: { label: 'Disponível ✓', cls: 'bg-green-100 text-green-700 border border-green-200' },
-};
-const PRIO_PILLS = {
-    alta: { label: '🔴 Alta', cls: 'bg-red-100 text-red-700 border border-red-200' },
-    media: { label: '🟡 Média', cls: 'bg-amber-100 text-amber-700 border border-amber-200' },
-    baixa: { label: '⚪ Baixa', cls: 'bg-gray-100 text-gray-500 border border-gray-200' },
+    waiting: { label: 'Aguardando', cls: 'bg-amber-50 text-amber-700 border-transparent shadow-none' },
+    available: { label: 'Disponível ✓', cls: 'bg-emerald-50 text-emerald-700 border-transparent shadow-none' },
 };
 
+// Constants removidas porque TIPO_CLIENTE_PILLS já subiu para o topo.
 const PRODUTOS_OPTS = ['Calça', 'Shorts', 'Jaqueta', 'Saia', 'Vestido', 'Blusa', 'Conjunto', 'T-Shirt', 'Cropped', 'Macacão'];
+
 const MODELOS_OPTS = ['Skinny', 'Wide Leg', 'Mom', 'Flare', 'Reta', 'Cargo', 'Fit', 'Tradicional'];
 const TAMANHOS_OPTS = ['01', '02', '03', '04', '06', '08', '10', '12', '14', '16', '18', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56', '58', 'P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'];
 const MARCAS_OPTS = [];
@@ -308,11 +533,21 @@ const BadgeSelector = ({ value = [], onChange, placeholder, options = [], colorC
     );
 };
 
-const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, crmCustomTags, addCrmCustomTag }) => {
-    const [form, setForm] = useState({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', prioridade: 'media', data: new Date().toISOString().slice(0, 10), status: 'waiting' });
+const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, crmCustomTags, addCrmCustomTag, saveCrmLead, userRole, STORE_CONFIGS }) => {
+    const [form, setForm] = useState({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', observacao: '', data: '1 mês', status: 'waiting', tipo_cliente: 'cliente', store_id: selectedStore });
     const [showForm, setShowForm] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const [sortWishlist, setSortWishlist] = useState('desc');
 
-    const storeOrders = (crmWishlist || []).filter(o => String(o.store_id) === String(selectedStore) || selectedStore === 'all');
+    const storeOrders = useMemo(() => {
+        const isGlobal = selectedStore === 'Todas' || selectedStore === 'all' || !selectedStore;
+        const orders = (crmWishlist || []).filter(o => isGlobal || String(o.store_id) === String(selectedStore));
+        return orders.sort((a, b) => {
+            const d1 = new Date(a.created_at || Date.now()).getTime();
+            const d2 = new Date(b.created_at || Date.now()).getTime();
+            return sortWishlist === 'desc' ? d2 - d1 : d1 - d2;
+        });
+    }, [crmWishlist, selectedStore, sortWishlist]);
 
     // Merge listas estáticas + tags salvas no banco para esta loja
     const tagsForCategory = (category, staticOpts) => {
@@ -322,8 +557,8 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
         return [...new Set([...staticOpts, ...dynamic])];
     };
     const produtosOpts = tagsForCategory('produto', PRODUTOS_OPTS);
-    const marcasOpts   = tagsForCategory('marca',   MARCAS_OPTS);
-    const modelosOpts  = tagsForCategory('modelo',  MODELOS_OPTS);
+    const marcasOpts = tagsForCategory('marca', MARCAS_OPTS);
+    const modelosOpts = tagsForCategory('modelo', MODELOS_OPTS);
     const tamanhosOpts = tagsForCategory('tamanho', TAMANHOS_OPTS);
 
     // Chamado pelo BadgeSelector ao criar uma tag nova (não existente nas opções)
@@ -333,22 +568,44 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
 
     const addOrder = async () => {
         if (!form.cliente.trim() || form.produto.length === 0) return;
+        // store_id: usa o selecionado no form (Owner pode trocar); Gerente herda selectedStore
+        const targetStore = (userRole === 'owner' && form.store_id) ? form.store_id : selectedStore;
         const savePayload = {
             ...form,
             produto: form.produto.join(', '),
             modelo: form.modelo.join(', '),
             tamanho: form.tamanho.join(', '),
             marca: form.marca.join(', '),
-            store_id: selectedStore
+            store_id: targetStore,
+            tipo_cliente: form.tipo_cliente || 'cliente'
         };
-        await saveCrmWishlist(savePayload, null);
-        setForm(f => ({ ...f, cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '' }));
+        await saveCrmWishlist(savePayload, editId);
+        setForm({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', observacao: '', data: '1 mês', status: 'waiting', tipo_cliente: 'cliente', store_id: selectedStore });
         setShowForm(false);
+        setEditId(null);
+    };
+
+    const handleEditOrder = (o) => {
+        setEditId(o.id);
+        setShowForm(true);
+        setForm({
+            cliente: o.cliente || o.client_name || '',
+            wpp: o.wpp || o.contato || o.contact_info || '',
+            status: o.status || 'waiting',
+            produto: o.produto ? o.produto.split(', ').filter(Boolean) : [],
+            modelo: o.modelo ? o.modelo.split(', ').filter(Boolean) : [],
+            tamanho: o.tamanho ? o.tamanho.split(', ').filter(Boolean) : [],
+            marca: o.marca ? o.marca.split(', ').filter(Boolean) : [],
+            observacao: o.observacao || o.notes || '',
+            data: o.data || o.prazo || o.target_date || o.data_pedido || '1 mês',
+            tipo_cliente: o.tipo_cliente || 'cliente'
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
                         <ShoppingBag className="w-4 h-4 text-white" />
@@ -358,166 +615,311 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
                         <p className="text-xs text-gray-400">{storeOrders.length} encomenda{storeOrders.length !== 1 ? 's' : ''} · Loja {selectedStore}</p>
                     </div>
                 </div>
-                <button onClick={() => setShowForm(s => !s)}
-                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all">
-                    <Plus className="w-3.5 h-3.5" /> Novo Pedido
-                </button>
+                <div className="flex items-center gap-2">
+                    <select value={sortWishlist} onChange={e => setSortWishlist(e.target.value)} className="text-xs font-bold bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer">
+                        <option value="desc">Mais Recentes ⬇</option>
+                        <option value="asc">Mais Antigos ⬆</option>
+                    </select>
+                    <button onClick={() => { setEditId(null); setForm({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', observacao: '', data: '1 mês', status: 'waiting', tipo_cliente: 'cliente', store_id: selectedStore }); setShowForm(s => !s); }}
+                        className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Novo Pedido
+                    </button>
+                </div>
             </div>
 
             {showForm && (
-                <div className="p-4 border-b border-gray-100 bg-amber-50">
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3">
-                        <input value={form.cliente} onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))}
-                            placeholder="Nome do cliente *" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:outline-none col-span-1" />
+                <div className="p-6 bg-white border border-gray-100/50 rounded-xl mx-5 mb-5 shadow-sm mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">1. WhatsApp / Contato</label>
+                            <input value={form.wpp} onChange={e => setForm(f => ({ ...f, wpp: e.target.value }))}
+                                placeholder="(XX) 9XXXX-XXXX" className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all placeholder-gray-300 bg-gray-50/50" />
+                        </div>
 
-                        <BadgeSelector value={form.produto} onChange={v => setForm(f => ({ ...f, produto: v }))} placeholder="Produto *" options={produtosOpts} colorClass="bg-blue-100 text-blue-700" onNewTag={v => handleNewTag('produto', v)} />
-                        <BadgeSelector value={form.marca} onChange={v => setForm(f => ({ ...f, marca: v }))} placeholder="Marca" options={marcasOpts} colorClass="bg-indigo-100 text-indigo-700" onNewTag={v => handleNewTag('marca', v)} />
-                        <BadgeSelector value={form.modelo} onChange={v => setForm(f => ({ ...f, modelo: v }))} placeholder="Modelo" options={modelosOpts} colorClass="bg-purple-100 text-purple-700" onNewTag={v => handleNewTag('modelo', v)} />
-                        <BadgeSelector value={form.tamanho} onChange={v => setForm(f => ({ ...f, tamanho: v }))} placeholder="Tamanho" options={tamanhosOpts} colorClass="bg-pink-100 text-pink-700" onNewTag={v => handleNewTag('tamanho', v)} />
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">2. Nome do Cliente *</label>
+                            <input value={form.cliente} onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))}
+                                placeholder="Ex: Maria Eduarda" className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all placeholder-gray-300 bg-gray-50/50" />
+                        </div>
 
-                        <input value={form.wpp} onChange={e => setForm(f => ({ ...f, wpp: e.target.value }))}
-                            placeholder="WhatsApp / Contato" className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:outline-none col-span-1" />
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">3. Status</label>
+                            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-gray-50/50">
+                                <option value="waiting">Aguardando</option>
+                                <option value="verificar">Verificar</option>
+                                <option value="pendente">Pendente de envio</option>
+                                <option value="respondido">Respondido</option>
+                            </select>
+                        </div>
+
+                        {/* Seletor de Loja — apenas para o Owner */}
+                        {userRole === 'owner' && STORE_CONFIGS && (
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">🏪 Loja de Destino</label>
+                                <select
+                                    value={form.store_id || selectedStore}
+                                    onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))}
+                                    className="border border-amber-300 bg-amber-50 rounded-lg px-3 py-2.5 text-sm font-bold text-amber-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-all"
+                                >
+                                    {Object.entries(STORE_CONFIGS).map(([k, v]) => (
+                                        <option key={k} value={k}>{v.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">4. Produto Solicitado *</label>
+                            <BadgeSelector value={form.produto} onChange={v => setForm(f => ({ ...f, produto: v }))} placeholder="Ex: Vestido, Blusa..." options={produtosOpts} colorClass="bg-blue-100 text-blue-700" onNewTag={v => handleNewTag('produto', v)} />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">5. Tamanho</label>
+                            <BadgeSelector value={form.tamanho} onChange={v => setForm(f => ({ ...f, tamanho: v }))} placeholder="Ex: P, 38..." options={tamanhosOpts} colorClass="bg-pink-100 text-pink-700" onNewTag={v => handleNewTag('tamanho', v)} />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">6. Marca (Opcional)</label>
+                            <BadgeSelector value={form.marca} onChange={v => setForm(f => ({ ...f, marca: v }))} placeholder="Ex: Farm, Animale..." options={marcasOpts} colorClass="bg-indigo-100 text-indigo-700" onNewTag={v => handleNewTag('marca', v)} />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">7. Modelo / Referência</label>
+                            <BadgeSelector value={form.modelo} onChange={v => setForm(f => ({ ...f, modelo: v }))} placeholder="Ex: Estampa floral..." options={modelosOpts} colorClass="bg-purple-100 text-purple-700" onNewTag={v => handleNewTag('modelo', v)} />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 md:col-span-2 lg:col-span-2">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">8. Observação</label>
+                            <textarea value={form.observacao} onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))} rows={1}
+                                placeholder="Detalhes adicionais..." className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all placeholder-gray-300 bg-gray-50/50" />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 md:col-span-2 lg:col-span-3">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Tipo de Cliente</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { key: 'cliente', label: '👤 Cliente', desc: 'Padrão' },
+                                    { key: 'vip', label: '✅ VIP', desc: 'Fiel' },
+                                    { key: 'b2b', label: '🏢 B2B', desc: 'Atacado' },
+                                ].map(({ key, label, desc }) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setForm(p => ({ ...p, tipo_cliente: key }))}
+                                        className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border-2 text-xs font-bold transition-all ${form.tipo_cliente === key
+                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <span className="text-sm">{label.split(' ')[0]} {label.split(' ').slice(1).join(' ')}</span>
+                                        <span className="text-[9px] font-normal text-gray-400">{desc}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))}
-                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:outline-none" />
-                        <select value={form.prioridade} onChange={e => setForm(f => ({ ...f, prioridade: e.target.value }))}
-                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:outline-none">
-                            <option value="alta">🔴 Alta</option>
-                            <option value="media">🟡 Média</option>
-                            <option value="baixa">⚪ Baixa</option>
-                        </select>
-                        <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:outline-none">
-                            <option value="waiting">Aguardando</option>
-                            <option value="available">Disponível</option>
-                        </select>
-                        <button onClick={addOrder} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all">
-                            Salvar
+
+                    <div className="pt-5 border-t border-gray-100 flex items-end justify-between gap-4">
+                        <div className="flex flex-col gap-1.5 flex-1 max-w-[340px]">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">9. Prazo / Expectativa</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['1 mês', '2 meses', '3 meses', 'Indefinido'].map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, data: opt }))}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${form.data === opt
+                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-700'
+                                            }`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <button onClick={addOrder} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-2">
+                            {editId ? 'Salvar Alterações' : 'Salvar Pedido'} <ArrowRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50/50 border-b border-gray-100">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Cliente</th>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Item</th>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Contato</th>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Prazo</th>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Data</th>
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 tracking-wide">Status</th>
-                            <th className="px-4 py-3 w-8"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {storeOrders.length === 0 && (
-                            <tr><td colSpan={7} className="py-10 text-center text-gray-400 text-sm">Nenhum pedido pendente</td></tr>
-                        )}
-                        {storeOrders.map(o => {
-                            const wppNumber = o.wpp || o.contato || o.contact || o.contact_info || '';
-                            const rawPhone = String(wppNumber).replace(/\D/g, '');
-                            const phone = rawPhone.startsWith('55') ? rawPhone : rawPhone ? `55${rawPhone}` : '';
-                            const detalhes = [o.produto || o.product, o.brand, o.modelo || o.model]
-                                .filter(Boolean).join(' ');
-                            const tamanho = o.tamanho || o.size || '';
-                            const partes = [detalhes, tamanho ? `no tamanho ${tamanho}` : '']
-                                .filter(Boolean).join(' ');
-                            const wppMsg = encodeURIComponent(
-                                `Oi ${o.cliente || o.client_name} ✨, tudo bem? Chegou reposição daquele(a) ${partes || 'item'} que você pediu! 😍👗`
-                            );
-                            const wppLink = phone ? `https://wa.me/${phone}?text=${wppMsg}` : null;
-                            const fullItemTitle = `${o.produto || o.product} ${o.modelo || o.model || ''} (${o.brand || 'Sem marca'})`;
-                            
-                            return (
-                                <tr key={o.id} className="hover:bg-gray-50/80 transition-colors group">
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-gray-800 text-sm truncate max-w-[150px]" title={o.cliente || o.client_name}>
-                                                {o.cliente || o.client_name}
-                                            </span>
-                                            {wppLink && (
-                                                <a href={wppLink} target="_blank" rel="noopener noreferrer" 
-                                                    className="text-gray-300 hover:text-green-500 transition-colors flex shrink-0" 
-                                                    title="Chamar no WhatsApp">
-                                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                                                </a>
-                                            )}
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {storeOrders.length === 0 && (
+                    <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-gray-100 border-dashed">
+                        <ShoppingBag className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                        <h4 className="text-gray-500 font-bold text-sm">Nenhum pedido pendente</h4>
+                        <p className="text-gray-400 text-xs mt-1">Crie um pedido para acompanhar as necessidades dos clientes.</p>
+                    </div>
+                )}
+                {storeOrders.map(o => {
+                    const clientName = o.cliente || o.client_name;
+                    const wppNumber = o.wpp || o.contato || o.contact || o.contact_info || '';
+                    const rawPhone = String(wppNumber).replace(/\D/g, '');
+                    const phone = rawPhone.startsWith('55') ? rawPhone : rawPhone ? `55${rawPhone}` : '';
+                    const productName = o.produto || o.product || o.product_name;
+
+                    const detalhes = [productName, o.brand, o.modelo || o.model].filter(Boolean).join(' ');
+                    const tamanho = o.tamanho || o.size || '';
+                    const partes = [detalhes, tamanho ? `no tamanho ${tamanho}` : ''].filter(Boolean).join(' ');
+                    const unescapedMsg = `Oi, ${clientName}! ✨\n\nTudo bem? Lembrei de você 💬\n\nChegou reposição daquele(a) *${partes || 'item'}* que você pediu! 😍👗\n\nCorre pra garantir o seu! 🏃‍♀️`;
+                    const wppMsg = encodeURIComponent(unescapedMsg);
+                    const wppLink = phone ? `https://wa.me/${phone}?text=${wppMsg}` : null;
+
+                    const tipoKey = o.tipo_cliente || o.priority || o.prioridade;
+                    const pPill = TIPO_CLIENTE_PILLS?.[tipoKey] || TIPO_CLIENTE_PILLS.cliente;
+
+                    const handleMoveToKanban = async () => {
+                        if (!saveCrmLead) return;
+                        const prodArr = (productName || '').split(',').map(s => s.trim()).filter(Boolean);
+                        const modArr = (o.modelo || o.model || '').split(',').map(s => s.trim()).filter(Boolean);
+                        const tamArr = (o.tamanho || o.size || '').split(',').map(s => s.trim()).filter(Boolean);
+                        const brandArr = (o.marca || o.brand || '').split(',').map(s => s.trim()).filter(Boolean);
+
+                        const newLead = {
+                            nome: clientName || 'Desconhecido',
+                            telefone: wppNumber,
+                            origem: 'Wishlist (Reposição)',
+                            estagio: 'Triagem',
+                            status: 'Triagem',
+                            store_id: selectedStore,
+                            produto: prodArr.join(', '),
+                            marca: brandArr.join(', '),
+                            modelo: modArr.join(', '),
+                            tamanho: tamArr.join(', ')
+                        };
+                        try {
+                            await saveCrmLead(newLead);
+                            await deleteCrmWishlist(o.id);
+                            alert('🎉 Lead encaminhado para o Funil de Vendas com sucesso!');
+                        } catch (err) { console.error(err); }
+                    };
+
+                    return (
+                        <div key={o.id} className="bg-white p-3 rounded-2xl border border-gray-200/80 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)] transition-all flex flex-col justify-between group relative">
+                            {/* Ações Hover */}
+                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                <button onClick={() => handleEditOrder(o)}
+                                    className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-indigo-100" title="Editar">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                </button>
+                                <button onClick={() => deleteCrmWishlist(o.id)}
+                                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-red-100" title="Excluir">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+
+                            <div>
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2.5 w-full pr-12">
+                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center font-bold text-indigo-600 text-sm shadow-inner border border-indigo-100/50 shrink-0">
+                                            {clientName ? clientName.charAt(0).toUpperCase() : '?'}
                                         </div>
-                                    </td>
-                                    
-                                    <td className="px-4 py-3">
-                                        <div className="flex flex-col max-w-[200px]">
-                                            <span className="text-gray-800 text-sm font-medium truncate" title={fullItemTitle}>
-                                                {o.produto || o.product} {o.modelo || o.model || ''} <span className="text-indigo-500 font-normal">{(o.brand) ? `(${o.brand})` : ''}</span>
-                                            </span>
-                                            <span className="text-gray-400 text-[11px] font-medium truncate">
-                                                Tam: {o.tamanho || o.size || 'Único'}
-                                            </span>
-                                            {o.observacao && (
-                                                <span className="text-amber-600 text-[10px] mt-0.5 truncate max-w-full" title={o.observacao}>
-                                                    Obs: {o.observacao}
+                                        <div className="min-w-0">
+                                            <h4 className="font-bold text-gray-900 text-sm truncate leading-tight" title={clientName}>
+                                                {clientName || 'Sem Nome'}
+                                            </h4>
+                                            <div className="flex items-center gap-1.5 text-[10px] items-baseline font-mono text-gray-400 mt-0.5">
+                                                {wppLink ? (
+                                                    <a href={wppLink} target="_blank" rel="noopener noreferrer" className="hover:text-green-500 transition-colors flex items-center gap-1 font-bold">
+                                                        <MessageCircle className="w-2.5 h-2.5" /> {wppNumber || 'Conectar'}
+                                                    </a>
+                                                ) : <span>{wppNumber || 'Sem contato'}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50/80 rounded-xl p-2.5 mb-1.5 border border-gray-100/50 mt-2">
+                                    <p className="text-[13px] font-bold text-gray-800 break-words line-clamp-2 leading-tight" title={productName}>
+                                        🛒 {productName}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {o.brand && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100">{o.brand}</span>}
+                                        {(o.tamanho || o.size) && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-50 text-pink-600 border border-pink-100">{o.tamanho || o.size}</span>}
+                                        {(o.modelo || o.model) && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-600 border border-purple-100">{o.modelo || o.model}</span>}
+                                    </div>
+                                    {o.observacao && <p className="text-[10px] text-gray-500 mt-2 bg-white px-2 py-1.5 border border-gray-200 border-dashed rounded italic leading-tight">{o.observacao}</p>}
+                                    {o.notes && <p className="text-[10px] text-gray-500 mt-2 bg-white px-2 py-1.5 border border-gray-200 border-dashed rounded italic leading-tight">{o.notes}</p>}
+                                </div>
+                            </div>
+
+                            <div className="pt-2 mt-2 border-t border-gray-100/60 flex flex-col justify-between h-auto">
+                                <div className="flex items-end justify-between w-full h-full pb-1">
+                                    <div className="flex flex-col gap-1.5">
+                                        {(() => {
+                                            const tipoKey = o.tipo_cliente || 'cliente';
+                                            const pill = TIPO_CLIENTE_PILLS?.[tipoKey] || { cls: 'bg-blue-50 text-blue-700 border-blue-100', label: '👤 Cliente' };
+                                            return (
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${pill.cls} w-fit`}>
+                                                    {pill.label}
                                                 </span>
-                                            )}
-                                        </div>
-                                    </td>
+                                            );
+                                        })()}
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                            Prazo: {o.data || o.prazo || o.target_date || o.data_pedido || '—'}
+                                        </span>
+                                    </div>
 
-                                    <td className="px-4 py-3 text-xs text-gray-500 font-mono">
-                                        {wppNumber || <span className="text-gray-300">—</span>}
-                                    </td>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <select
+                                            value={o.status || 'waiting'}
+                                            onChange={async (e) => {
+                                                const novoStatus = e.target.value;
+                                                await updateCrmWishlistStatus(o.id, novoStatus);
+                                            }}
+                                            className={`text-[9px] uppercase font-bold px-1.5 py-1 rounded-lg border appearance-none cursor-pointer outline-none transition-colors ${o.status === 'available' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 shadow-sm'}`}
+                                        >
+                                            <option value="waiting">⏳ Aguardando</option>
+                                            <option value="available">✅ Disponível</option>
+                                        </select>
 
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-1.5 font-medium">
-                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full border ${(PRIO_PILLS[o.prioridade] || PRIO_PILLS.baixa).cls}`}>
-                                                {(PRIO_PILLS[o.prioridade] || PRIO_PILLS.baixa).label}
-                                            </span>
-                                        </div>
-                                    </td>
+                                        {o.status === 'available' && (
+                                            <button onClick={handleMoveToKanban} className="text-[9px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-2 py-1.5 rounded-lg shadow-sm shadow-emerald-200 transition-all flex items-center animate-pulse">
+                                                Kanban <ArrowRight className="w-2.5 h-2.5 ml-0.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {o.created_at && (
+                                    <div className="w-full text-center mt-2 group-hover:opacity-100 opacity-60 transition-opacity">
+                                        <span className="text-[9px] text-gray-400 font-medium">Criado em: <span className="font-bold">{formatDateShort(o.created_at)}</span></span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
 
-                                    <td className="px-4 py-3 text-xs text-gray-500 font-medium">
-                                        {new Date(o.data + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                    </td>
-
-                                    <td className="px-4 py-3">
-                                        <button onClick={() => updateCrmWishlistStatus(o.id, o.status === 'waiting' ? 'available' : 'waiting')}
-                                            className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-full border shadow-sm transition-all hover:scale-105 active:scale-95 ${STATUS_PILLS[o.status]?.cls || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                            {STATUS_PILLS[o.status] ? STATUS_PILLS[o.status].label : o.status}
-                                        </button>
-                                    </td>
-
-                                    <td className="px-4 py-3 text-right">
-                                        <button onClick={() => deleteCrmWishlist(o.id)}
-                                            className="text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 p-1.5 rounded-lg">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
             </div>
         </div>
     );
 };
 
 // ─── Main CRM ───────────────────────────────────────────────────
-const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishlist, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, crmCustomTags, addCrmCustomTag, selectedStore }) => {
+const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCrmLead, crmWishlist, saveCrmWishlist, deleteCrmWishlist, updateCrmWishlistStatus, crmCustomTags, addCrmCustomTag, selectedStore, systemData, userRole, STORE_CONFIGS }) => {
     // Optimistic UI State for Drag & Drop
     const [optimisticLeads, setOptimisticLeads] = useState(crmLeads || []);
     useEffect(() => {
         setOptimisticLeads(crmLeads || []);
     }, [crmLeads]);
-    
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isMermaidDrawerOpen, setIsMermaidDrawerOpen] = useState(false);
+    // ⚡ Scripts Drawer
+    const [isScriptsDrawerOpen, setIsScriptsDrawerOpen] = useState(false);
+    const [focusedStage, setFocusedStage] = useState(null);
+    const [focusedLead, setFocusedLead] = useState(null);
+    const [copiedScript, setCopiedScript] = useState(null);
+    const containerRef = useRef(null);
+    const [activeTab, setActiveTab] = useState('pipeline'); // 'pipeline' | 'wishlist' | 'radar' | 'playbook'
     const [editLead, setEditLead] = useState(null);
     const [search, setSearch] = useState('');
     const [filterStage, setFilterStage] = useState('all');
     const [expandedCols, setExpandedCols] = useState({});
-    const [form, setForm] = useState({ nome: '', telefone: '', origem: '', estagio: 'Triagem', produto: [], marca: [], modelo: [], tamanho: [] });
+    const [form, setForm] = useState({ nome: '', telefone: '', origem: '', estagio: 'Triagem', produto: [], marca: [], modelo: [], tamanho: [], tipo_cliente: 'cliente', store_id: selectedStore });
     // 🎯 Drag & Drop
     const [dragLeadId, setDragLeadId] = useState(null);
     const [dragOverStage, setDragOverStage] = useState(null);
@@ -530,8 +932,8 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishl
         return [...new Set([...staticOpts, ...dynamic])];
     };
     const produtosOpts = tagsForCategory('produto', PRODUTOS_OPTS);
-    const marcasOpts   = tagsForCategory('marca',   MARCAS_OPTS);
-    const modelosOpts  = tagsForCategory('modelo',  MODELOS_OPTS);
+    const marcasOpts = tagsForCategory('marca', MARCAS_OPTS);
+    const modelosOpts = tagsForCategory('modelo', MODELOS_OPTS);
     const tamanhosOpts = tagsForCategory('tamanho', TAMANHOS_OPTS);
 
     const handleNewTag = (category, value) => {
@@ -552,12 +954,12 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishl
         if (dragLeadId && stageId) {
             // Backup do estado anterior para fallback
             const previousState = [...optimisticLeads];
-            
+
             // Atualização Otimista OBRIGATÓRIA (Micro-Sprint 10.2)
-            setOptimisticLeads(prev => 
+            setOptimisticLeads(prev =>
                 prev.map(lead => lead.id === dragLeadId ? { ...lead, estagio: stageId, status: stageId } : lead)
             );
-            
+
             // Disparo Assíncrono para o Backend
             try {
                 await moveCrmLeadStage(dragLeadId, stageId);
@@ -575,133 +977,401 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishl
         setDragOverStage(null);
     };
 
-    const openModal = (lead = null, defaultStage = 'Triagem') => {
+    const openModal = (lead = null, defaultStage = STAGES[0].id) => {
         if (lead) {
             setEditLead(lead);
-            setForm({ 
-                nome: lead.nome || lead.name || '', 
-                telefone: lead.telefone || '', 
-                origem: lead.origem || '', 
+            setForm({
+                nome: lead.nome || lead.name || '',
+                telefone: lead.telefone || '',
+                origem: lead.origem || '',
                 estagio: lead.status || lead.estagio || 'Triagem',
                 produto: lead.produto ? lead.produto.split(', ').filter(Boolean) : [],
                 marca: lead.marca ? lead.marca.split(', ').filter(Boolean) : [],
                 modelo: lead.modelo ? lead.modelo.split(', ').filter(Boolean) : [],
                 tamanho: lead.tamanho ? lead.tamanho.split(', ').filter(Boolean) : [],
+                tipo_cliente: lead.tipo_cliente || 'cliente',
+                // Preserva a loja original do lead na edição
+                store_id: lead.store_id || (selectedStore === 'all' ? '10' : String(selectedStore)),
             });
         } else {
             setEditLead(null);
-            setForm({ nome: '', telefone: '', origem: '', estagio: defaultStage, produto: [], marca: [], modelo: [], tamanho: [] });
+            setForm({ nome: '', telefone: '', origem: '', estagio: defaultStage, produto: [], marca: [], modelo: [], tamanho: [], tipo_cliente: 'cliente', store_id: selectedStore === 'all' ? '10' : String(selectedStore) });
         }
         setIsModalOpen(true);
     };
 
     const handleSave = async () => {
-        if (!form.nome.trim()) return;
+        if (!form.nome?.trim()) return;
+        // store_id: usa o selecionado no modal (Owner pode trocar); Gerente herda selectedStore
+        const fallbackStore = selectedStore === 'all' ? '10' : String(selectedStore);
+        const targetStore = (userRole === 'owner' && form.store_id) ? form.store_id : fallbackStore;
         const savePayload = {
             ...(editLead || {}),
             ...form,
             status: form.estagio,
-            store_id: selectedStore,
+            store_id: targetStore,
             produto: form.produto.join(', '),
             marca: form.marca.join(', '),
             modelo: form.modelo.join(', '),
             tamanho: form.tamanho.join(', '),
+            tipo_cliente: form.tipo_cliente || 'cliente',
         };
-        await saveCrmLead(savePayload);
+        await saveCrmLead(savePayload, editLead?.id || null);
         setIsModalOpen(false);
         setEditLead(null);
     };
 
     const leads = useMemo(() => {
+        const isGlobal = selectedStore === 'Todas' || selectedStore === 'all' || !selectedStore;
         return optimisticLeads.filter(l => {
+            if (!isGlobal && String(l.store_id) !== String(selectedStore)) return false;
             const stage = l.status || l.estagio;
+            if (!STAGES.find(s => s.id === stage)) return false;
             if (filterStage !== 'all' && stage !== filterStage) return false;
             if (search) {
                 const q = search.toLowerCase();
                 return (l.nome || l.name || '').toLowerCase().includes(q) ||
                     (l.telefone || '').includes(q) ||
+                    (l.produto || '').toLowerCase().includes(q) ||
                     (l.origem || '').toLowerCase().includes(q);
             }
             return true;
         });
-    }, [optimisticLeads, filterStage, search]);
+    }, [optimisticLeads, filterStage, search, selectedStore]);
+
+    // ── Motor de Matchmaking CRM × Estoque ──────────────────────────────────
+    const radarMatches = useMemo(() => {
+        const stock = systemData || [];
+        const allLeads = optimisticLeads.filter(l => {
+            const stage = l.status || l.estagio;
+            return !!STAGES.find(s => s.id === stage);
+        });
+        const results = [];
+        for (const lead of allLeads) {
+            const leadCreated = lead.created_at ? new Date(lead.created_at).getTime() : 0;
+            // Normaliza produtos/tamanhos do lead como arrays lowercase
+            const leadProdutos = (lead.produto || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const leadTamanhos = (lead.tamanho || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const leadMarcas = (lead.marca || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const leadModelos = (lead.modelo || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            if (leadProdutos.length === 0 || leadTamanhos.length === 0) continue;
+
+            const matchingItems = [];
+            for (const item of stock) {
+                // Condição 1: item entrou no estoque APÓS o lead ser criado
+                const itemDate = item.DATAENTRADA ? new Date(item.DATAENTRADA).getTime() : 0;
+                if (itemDate <= leadCreated) continue;
+
+                const itemTipo = (item.TIPODESC || item.MARCADESC || '').toLowerCase();
+                const itemMarca = (item.MARCA || '').toLowerCase();
+                const itemRef = (item.REFERENCIA || '').toLowerCase();
+                const itemSizes = item.sizes || {};
+
+                // Condição 2: produto coincide (verifica TIPODESC ou MARCADESC)
+                const prodMatch = leadProdutos.some(p =>
+                    itemTipo.includes(p) || p.includes(itemTipo)
+                );
+                if (!prodMatch) continue;
+
+                // Condição 2: tamanho com estoque > 0
+                const sizeMatch = leadTamanhos.some(t => {
+                    const sizeKey = Object.keys(itemSizes).find(k => k.toLowerCase() === t);
+                    return sizeKey && (itemSizes[sizeKey] > 0);
+                });
+                if (!sizeMatch) continue;
+
+                // Condição 3 (opcional): marca
+                if (leadMarcas.length > 0) {
+                    const marcaOk = leadMarcas.some(m => itemMarca.includes(m) || m.includes(itemMarca));
+                    if (!marcaOk) continue;
+                }
+
+                // Condição 3 (opcional): modelo
+                if (leadModelos.length > 0) {
+                    const modeloOk = leadModelos.some(m => itemRef.includes(m) || m.includes(itemRef));
+                    if (!modeloOk) continue;
+                }
+
+                matchingItems.push(item);
+            }
+
+            if (matchingItems.length > 0) {
+                results.push({ lead, matchingItems });
+            }
+        }
+        return results;
+    }, [optimisticLeads, systemData]);
 
     const totalLeads = leads.length;
     const byStage = STAGES.map(s => ({ ...s, count: leads.filter(l => (l.status || l.estagio) === s.id).length }));
 
-    const dashboardProjects = useMemo(() => {
-        return leads.map(lead => {
-            const stage = STAGES.find(s => s.id === (lead.status || lead.estagio)) || STAGES[0];
-            return {
-                id: lead.id,
-                name: lead.nome || lead.name || 'Sem Nome',
-                subtitle: lead.origem || 'Website',
-                date: formatDate(lead.created_at),
-                progress: stage.id === 'Triagem' ? 10 : stage.id === 'Sondagem' ? 30 : stage.id === 'Visita' ? 60 : stage.id === 'Fechamento' ? 100 : 0,
-                status: stage.id,
-                accentColor: stage.id === 'Ghosting' ? '#ef4444' : stage.id === 'Fechamento' ? '#22c55e' : stage.id === 'Visita' ? '#6366f1' : stage.id === 'Sondagem' ? '#a855f7' : '#3b82f6',
-                bgColorClass: 'bg-white dark:bg-slate-800',
-            };
-        });
-    }, [leads]);
-
-    const handleProjectAction = (id, action) => {
-        if (action === "whatsapp") {
-            const lead = leads.find(l => l.id === id);
-            if (lead && lead.telefone) {
-                const phone = String(lead.telefone).replace(/\D/g, '');
-                if (phone.length >= 8) window.open(`https://wa.me/55${phone}`, '_blank');
-            }
-        } else if (action === "edit") {
-            const lead = leads.find(l => l.id === id);
-            if (lead) openModal(lead);
-        } else if (action === "delete") {
-            if (window.confirm("Deseja realmente excluir este cliente?")) {
-                // Priority fallback if user meant wishlist vs lead archive
-                if (typeof deleteCrmWishlist === 'function') deleteCrmWishlist(id);
-                else if (typeof archiveCrmLead === 'function') archiveCrmLead(id);
-            }
-        }
-    };
 
     return (
         <div className="flex flex-col h-full w-full bg-gray-50 overflow-hidden fade-in">
+
+            {/* ── Tab Navigation ── */}
+            <div className="flex items-center gap-1 px-5 pt-4 pb-0 shrink-0 border-b border-gray-200 bg-white">
+                <button
+                    onClick={() => setActiveTab('pipeline')}
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-t-xl border border-b-0 transition-all ${activeTab === 'pipeline'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
+                        }`}
+                >
+                    📥 Pipeline de Vendas
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === 'pipeline' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                        }`}>{leads.length}</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab('wishlist')}
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-t-xl border border-b-0 transition-all ${activeTab === 'wishlist'
+                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
+                        }`}
+                >
+                    🛒 Lista de Desejos
+                </button>
+                <button
+                    onClick={() => setActiveTab('radar')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-t-xl border border-b-0 transition-all ${activeTab === 'radar'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
+                        }`}
+                >
+                    🎯 Radar
+                    {radarMatches.length > 0 && (
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === 'radar' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700 animate-pulse'
+                            }`}>{radarMatches.length}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('playbook')}
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-t-xl border border-b-0 transition-all ${activeTab === 'playbook'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
+                        }`}
+                >
+                    <BookOpen className="w-4 h-4" /> Playbook
+                </button>
+                <div className="ml-auto flex items-center gap-2 pb-1">
+                    <button onClick={() => setIsMermaidDrawerOpen(true)} className="lg:hidden text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <Code2 className="w-3.5 h-3.5" /> Scripts
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Tab Content ── */}
             <div className="flex-1 overflow-hidden">
-                <div className="h-full flex flex-col pt-0 p-4 md:p-5 gap-4">
-                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
-                        <ProjectDashboard
-                            title="Pipeline de Vendas"
-                            projects={dashboardProjects}
-                            view="kanban"
-                            onProjectAction={handleProjectAction}
-                            onProjectUpdate={(p) => {
-                                // Optimistic update
-                                setOptimisticLeads(prev => prev.map(l => l.id === p.id ? { ...l, estagio: p.status, status: p.status } : l));
-                                // API update
-                                moveCrmLeadStage(p.id, p.status);
-                            }}
-                            onProjectClick={(id) => {
-                                const l = leads.find(x => x.id === id || x.id === Number(id));
-                                if (l) openModal(l);
-                            }}
-                            onProjectCreate={() => openModal(null, 'Triagem')}
-                            className="h-full border-none rounded-t-2xl"
-                        />
-                        
-                        {/* Encomendas — mesma coluna, na base */}
-                        <div className="shrink-0 bg-white border-t border-gray-100 overflow-y-auto max-h-[35vh]">
-                            <EncomendasSection
-                                selectedStore={selectedStore}
-                                crmWishlist={crmWishlist}
-                                saveCrmWishlist={saveCrmWishlist}
-                                deleteCrmWishlist={deleteCrmWishlist}
-                                updateCrmWishlistStatus={updateCrmWishlistStatus}
-                                crmCustomTags={crmCustomTags || []}
-                                addCrmCustomTag={addCrmCustomTag}
-                            />
+                {activeTab === 'pipeline' ? (
+                    <div className="h-full flex flex-col pt-3 pb-4 md:px-5">
+                        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                            {/* Pipeline Header */}
+                            <div className="flex flex-wrap items-center justify-between px-5 py-4 border-b border-gray-100 gap-3">
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                    <div className="relative flex-1 sm:flex-none">
+                                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all w-full sm:w-[280px] bg-gray-50/50 placeholder-gray-400"
+                                            placeholder="Pesquisar nome, contato, produto..."
+                                        />
+                                        {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                    <AlertBell leads={leads} />
+                                    <button onClick={() => openModal(null, STAGES[0].id)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-sm shadow-indigo-200 flex items-center gap-2 justify-center w-full sm:w-auto">
+                                        <Plus className="w-4 h-4" /> Cadastrar Venda
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Kanban Board Area */}
+                            <div className="flex-1 overflow-hidden flex">
+                                <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 bg-gray-50/30 custom-scrollbar">
+                                    <div className="flex gap-4 h-full min-w-max pb-3">
+                                        {STAGES.map(stage => {
+                                            const stageLeads = leads.filter(l => (l.status || l.estagio) === stage.id);
+                                            const isOver = dragOverStage === stage.id;
+                                            return (
+                                                <div key={stage.id}
+                                                    className={`w-72 flex flex-col rounded-2xl border-2 transition-colors ${isOver ? 'border-indigo-400 bg-indigo-50/50' : 'border-transparent bg-gray-100/60'} shadow-sm overflow-hidden h-full shrink-0`}
+                                                    onDragOver={(e) => { e.preventDefault(); setDragOverStage(stage.id); }}
+                                                    onDragLeave={() => setDragOverStage(null)}
+                                                    onDrop={() => {
+                                                        if (dragLeadId !== null && dragOverStage === stage.id) {
+                                                            moveCrmLeadStage(dragLeadId, stage.id);
+                                                            setOptimisticLeads(prev => prev.map(l => l.id === dragLeadId ? { ...l, estagio: stage.id, status: stage.id } : l));
+                                                        }
+                                                        setDragLeadId(null);
+                                                        setDragOverStage(null);
+                                                    }}
+                                                >
+                                                    {/* Column Header */}
+                                                    <div className={`px-4 py-3 border-b flex items-center justify-between bg-white rounded-t-xl`}>
+                                                        <div className="font-bold text-[13px] text-gray-800 flex items-center gap-2">
+                                                            <span>{stage.emoji}</span> {stage.label}
+                                                        </div>
+                                                        <span className={`text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-lg ${stage.col}`}>{stageLeads.length}</span>
+                                                    </div>
+
+                                                    {/* Leads Container */}
+                                                    <div className="p-3 flex-1 overflow-y-auto space-y-3 thin-scrollbar">
+                                                        {stageLeads.map(lead => (
+                                                            <LeadCard
+                                                                key={lead.id}
+                                                                lead={lead}
+                                                                stages={STAGES}
+                                                                onMove={(id, novaStage) => {
+                                                                    moveCrmLeadStage(id, novaStage);
+                                                                    setOptimisticLeads(prev => prev.map(l => l.id === id ? { ...l, estagio: novaStage, status: novaStage } : l));
+                                                                }}
+                                                                onArchive={archiveCrmLead}
+                                                                onEdit={(l) => openModal(l)}
+                                                                onDragStart={() => setDragLeadId(lead.id)}
+                                                                onDragEnd={() => setDragLeadId(null)}
+                                                                isDragging={dragLeadId === lead.id}
+                                                                onScriptOpen={(l) => {
+                                                                    setFocusedLead(l);
+                                                                    setFocusedStage(stage.id);
+                                                                    setIsScriptsDrawerOpen(true);
+                                                                }}
+                                                            />
+                                                        ))}
+                                                        {stageLeads.length === 0 && (
+                                                            <div className="text-center text-xs text-gray-400 py-8 border-2 border-dashed border-gray-200/60 rounded-xl my-2 mx-1">Coluna Vazia</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                                {/* Sidebar Right (Playbook) */}
+                                <div className="hidden xl:flex w-[340px] border-l border-gray-100 bg-white shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10 flex-col relative">
+                                    <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/40 to-transparent shrink-0">
+                                        <h3 className="font-bold text-gray-800 flex items-center gap-2"><BookOpen className="w-4 h-4 text-indigo-500" /> Guia Rápido</h3>
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                        <PlaybookTab readOnly={true} />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : activeTab === 'radar' ? (
+                    <div className="h-full overflow-y-auto p-4 md:p-5">
+                        {/* ── Radar Header ── */}
+                        <div className="mb-5 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">🎯 Radar de Matches</h2>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    {radarMatches.length === 0
+                                        ? 'Nenhum match encontrado no momento. O sistema compara produto, tamanho, marca e modelo dos Leads com o Estoque.'
+                                        : `${radarMatches.length} lead${radarMatches.length !== 1 ? 's' : ''} com produtos disponíveis no estoque — oportunidade de venda imediata!`}
+                                </p>
+                            </div>
+                        </div>
+
+                        {radarMatches.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-gray-300">
+                                <span className="text-6xl mb-4">🎯</span>
+                                <p className="text-sm font-bold">Radar silencioso</p>
+                                <p className="text-xs mt-1 text-gray-400">Novos itens no estoque serão cruzados automaticamente</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {radarMatches.map(({ lead, matchingItems }) => {
+                                    const phone = String(lead.telefone || '').replace(/\D/g, '');
+                                    const produto = lead.produto || '';
+                                    const marca = lead.marca ? ` ${lead.marca}` : '';
+                                    const modelo = lead.modelo ? ` ${lead.modelo}` : '';
+                                    const tamanho = lead.tamanho || '';
+                                    const wppMsg = encodeURIComponent(
+                                        `Oi, ${lead.nome || lead.name}
+Novidade boa 🎉
+Lembra que você pediu pra eu te avisar quando chegasse *${produto}${marca}${modelo} tamanho ${tamanho}* ?
+Acabou de chegar aqui na nossa loja 😉
+ 
+Vamos te enviar as fotos ✅`
+                                    );
+                                    const wppLink = phone.length >= 8 ? `https://wa.me/55${phone}?text=${wppMsg}` : null;
+                                    const stage = STAGES.find(s => s.id === (lead.status || lead.estagio)) || STAGES[0];
+
+                                    return (
+                                        <div key={lead.id} className="bg-white border-2 border-emerald-300 rounded-2xl shadow-md overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                                            {/* Barra verde de sucesso */}
+                                            <div className="h-1.5 bg-gradient-to-r from-emerald-400 to-green-500 w-full" />
+                                            <div className="p-4">
+                                                {/* Header do card */}
+                                                <div className="flex items-start justify-between gap-2 mb-3">
+                                                    <div>
+                                                        <div className="font-black text-gray-900 text-sm leading-tight">{lead.nome || lead.name}</div>
+                                                        <div className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wide">{lead.origem || 'Lead'}</div>
+                                                    </div>
+                                                    <span className={`text-[9px] font-black px-2 py-1 rounded-full ${stage.pill}`}>{stage.emoji} {stage.label}</span>
+                                                </div>
+
+                                                {/* Interesse do Lead */}
+                                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
+                                                    <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1.5">Interesse do Lead</div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {produto && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">{produto}</span>}
+                                                        {lead.marca && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">{lead.marca}</span>}
+                                                        {lead.modelo && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded">{lead.modelo}</span>}
+                                                        {tamanho && <span className="px-2 py-0.5 bg-pink-100 text-pink-700 text-[10px] font-bold rounded">Tam. {tamanho}</span>}
+                                                    </div>
+                                                </div>
+
+                                                {/* Items com match */}
+                                                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
+                                                    {matchingItems.length} item{matchingItems.length !== 1 ? 's' : ''} no estoque
+                                                </div>
+                                                <div className="space-y-1 max-h-24 overflow-y-auto mb-3">
+                                                    {matchingItems.slice(0, 4).map((item, i) => (
+                                                        <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
+                                                            <span className="text-[10px] font-bold text-gray-700 truncate flex-1">{item.TIPODESC || item.MARCADESC || item.REFERENCIA}</span>
+                                                            <span className="text-[9px] text-gray-400 font-mono shrink-0">{item.REFERENCIA}</span>
+                                                        </div>
+                                                    ))}
+                                                    {matchingItems.length > 4 && <div className="text-[9px] text-gray-400 text-center">+{matchingItems.length - 4} mais</div>}
+                                                </div>
+
+                                                {/* Gatilho de Venda */}
+                                                {wppLink ? (
+                                                    <a href={wppLink} target="_blank" rel="noreferrer"
+                                                        className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-black w-full justify-center transition-all shadow-sm shadow-emerald-200">
+                                                        <Send className="w-3.5 h-3.5" /> Avisar via WhatsApp
+                                                    </a>
+                                                ) : (
+                                                    <div className="text-[10px] text-gray-400 text-center py-2">Sem telefone cadastrado</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ) : activeTab === 'wishlist' ? (
+                    <div className="h-full overflow-y-auto p-4 md:p-5">
+                        <EncomendasSection
+                            selectedStore={selectedStore}
+                            crmWishlist={crmWishlist}
+                            saveCrmWishlist={saveCrmWishlist}
+                            deleteCrmWishlist={deleteCrmWishlist}
+                            updateCrmWishlistStatus={updateCrmWishlistStatus}
+                            crmCustomTags={crmCustomTags || []}
+                            addCrmCustomTag={addCrmCustomTag}
+                            saveCrmLead={saveCrmLead}
+                            userRole={userRole}
+                            STORE_CONFIGS={STORE_CONFIGS}
+                        />
+                    </div>
+                ) : activeTab === 'playbook' ? (
+                    <PlaybookTab />
+                ) : null}
             </div>
 
             {/* Mobile Mermaid Drawer */}
@@ -736,7 +1406,149 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishl
             </button>
 
 
+            {/* ══════════════════════════════════════════════════════
+                ⚡ SCRIPTS DRAWER — Playbook Contextual
+            ══════════════════════════════════════════════════════ */}
+
+            {/* Backdrop */}
+            {isScriptsDrawerOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-[55] backdrop-blur-sm"
+                    onClick={() => setIsScriptsDrawerOpen(false)}
+                />
+            )}
+
+            {/* Drawer Panel */}
+            <div className={`fixed top-0 right-0 h-full w-full max-w-[380px] bg-white z-[60] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${isScriptsDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+
+                {/* Header */}
+                <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-4 flex items-center justify-between shrink-0">
+                    <div>
+                        <div className="flex items-center gap-2 font-black text-base">
+                            <span>⚡</span> Scripts do Playbook
+                        </div>
+                        {focusedLead && (
+                            <p className="text-xs text-amber-100 mt-0.5 font-medium">
+                                Lead: <span className="font-black text-white">{focusedLead.nome || focusedLead.name}</span>
+                            </p>
+                        )}
+                    </div>
+                    <button onClick={() => setIsScriptsDrawerOpen(false)} className="text-white/70 hover:text-white transition-colors p-1.5 hover:bg-white/10 rounded-lg">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Lead context chips */}
+                {focusedLead && (
+                    <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex flex-wrap gap-1.5 shrink-0">
+                        {[
+                            { icon: '👤', val: focusedLead.nome || focusedLead.name },
+                            { icon: '👗', val: focusedLead.produto },
+                            { icon: '🏷️', val: focusedLead.modelo },
+                            { icon: '📐', val: focusedLead.tamanho },
+                        ].filter(c => c.val).map((c, i) => (
+                            <span key={i} className="text-[10px] font-bold bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+                                {c.icon} {c.val}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                {/* Scripts list */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {(() => {
+                        // ── Motor de Replace ────────────────────────────────
+                        const handleCopyScript = (textoOriginal, comando) => {
+                            const nome = (focusedLead?.nome || focusedLead?.name || '').trim() || '___';
+                            const modelo = (focusedLead?.modelo || '').trim() || '___';
+                            const tamanho = (focusedLead?.tamanho || '').trim() || '___';
+                            const mensagem = textoOriginal
+                                .replace(/\[Nome\]/gi, nome)
+                                .replace(/\[Modelo\]/gi, modelo)
+                                .replace(/\[Tamanho\]/gi, tamanho);
+                            navigator.clipboard.writeText(mensagem).catch(() => { });
+                            setCopiedScript(comando);
+                            setTimeout(() => setCopiedScript(null), 2000);
+                        };
+
+                        // ── Filtra categorias pelo estágio ──────────────────
+                        const categorias = STAGE_TO_SCRIPTS[focusedStage] || [];
+                        if (categorias.length === 0) {
+                            return (
+                                <div className="flex flex-col items-center justify-center py-16 text-gray-300 text-center">
+                                    <span className="text-5xl mb-3">📭</span>
+                                    <p className="text-sm font-bold text-gray-400">Nenhum script para esta etapa.</p>
+                                    <p className="text-xs text-gray-300 mt-1">Esta coluna não tem atalhos configurados.</p>
+                                </div>
+                            );
+                        }
+
+                        return categorias.map(cat => {
+                            const atalhos = ATALHOS_WHATSAPP[cat] || [];
+                            return (
+                                <div key={cat} className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                                    {/* Categoria header */}
+                                    <div className="px-4 py-2.5 bg-white border-b border-gray-100 flex items-center gap-2">
+                                        <span className="text-xs font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                            {cat}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400">{atalhos.length} atalho{atalhos.length !== 1 ? 's' : ''}</span>
+                                    </div>
+
+                                    {/* Scripts */}
+                                    <div className="p-3 space-y-3">
+                                        {atalhos.map(a => {
+                                            const isCopied = copiedScript === a.comando;
+                                            // Preview com substituição
+                                            const nomePrev = (focusedLead?.nome || focusedLead?.name || '___');
+                                            const modeloPrev = focusedLead?.modelo || '___';
+                                            const tamanhoPrev = focusedLead?.tamanho || '___';
+                                            const preview = a.texto
+                                                .replace(/\[Nome\]/gi, `**${nomePrev}**`)
+                                                .replace(/\[Modelo\]/gi, `**${modeloPrev}**`)
+                                                .replace(/\[Tamanho\]/gi, `**${tamanhoPrev}**`);
+
+                                            return (
+                                                <div key={a.comando} className="bg-white rounded-xl border border-gray-100 p-3 relative shadow-sm">
+                                                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 mb-2 inline-block">
+                                                        {a.comando}
+                                                    </span>
+                                                    <p className="text-[12px] text-gray-600 italic leading-relaxed border-l-2 border-amber-200 pl-2 mt-1 mb-3 whitespace-pre-line">
+                                                        "{a.texto}"
+                                                    </p>
+                                                    <button
+                                                        onClick={() => handleCopyScript(a.texto, a.comando)}
+                                                        className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${isCopied
+                                                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                                            : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400'
+                                                            }`}
+                                                    >
+                                                        {isCopied ? (
+                                                            <><Check className="w-3.5 h-3.5" /> ✅ Copiado com dados do lead!</>
+                                                        ) : (
+                                                            <><Copy className="w-3.5 h-3.5" /> Copiar com nome de {focusedLead?.nome?.split(' ')[0] || 'cliente'}</>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        });
+                    })()}
+                </div>
+
+                {/* Footer hint */}
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 shrink-0">
+                    <p className="text-[10px] text-gray-400 text-center">
+                        ⚡ Clique em <span className="font-bold text-amber-600">outro card ⚡</span> para trocar o contexto do lead
+                    </p>
+                </div>
+            </div>
+
             {/* ── Modal Novo / Editar Lead ── */}
+
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
                     onClick={e => e.target === e.currentTarget && setIsModalOpen(false)}>
@@ -788,8 +1600,49 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, archiveCrmLead, crmWishl
                                     {STAGES.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
                                 </select>
                             </div>
-                            
-                            <button onClick={handleSave} disabled={!form.nome.trim()}
+
+                            {/* Seletor de Loja — apenas para o Owner */}
+                            {userRole === 'owner' && STORE_CONFIGS && (
+                                <div>
+                                    <label className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1.5 block">🏪 Loja de Destino</label>
+                                    <select
+                                        value={form.store_id || selectedStore}
+                                        onChange={e => setForm(p => ({ ...p, store_id: e.target.value }))}
+                                        className="w-full border border-amber-300 bg-amber-50 rounded-xl px-3 py-2.5 text-sm font-bold text-amber-800 focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                                    >
+                                        {Object.entries(STORE_CONFIGS).map(([k, v]) => (
+                                            <option key={k} value={k}>{v.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tipo de Cliente</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { key: 'cliente', label: '👤 Cliente', desc: 'Padrão' },
+                                        { key: 'vip', label: '✅ VIP', desc: 'Fiel' },
+                                        { key: 'b2b', label: '🏢 B2B', desc: 'Empresa' },
+                                    ].map(({ key, label, desc }) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setForm(p => ({ ...p, tipo_cliente: key }))}
+                                            className={`flex flex-col items-center gap-0.5 p-2.5 rounded-xl border-2 text-xs font-bold transition-all ${form.tipo_cliente === key
+                                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                                                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <span className="text-base">{label.split(' ')[0]}</span>
+                                            <span>{label.split(' ').slice(1).join(' ')}</span>
+                                            <span className="text-[9px] font-normal text-gray-400">{desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button onClick={handleSave} disabled={!form.nome?.trim()}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl transition-all mt-2 shadow-sm">
                                 {editLead ? 'Salvar Alterações' : 'Adicionar Lead'}
                             </button>

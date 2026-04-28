@@ -531,8 +531,8 @@ export const KanbanBoard = ({ tasks, saveTask, moveTaskStatus, moveTaskCamada, d
             <div className="border-t border-gray-200" />
 
             {/* ═══════════════════ CAMADA 3: PLANO DE AÇÃO ════════════════ */}
-            <section className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
+            <section className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex items-center justify-between mb-4 shrink-0">
                     <div>
                         <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
                             🗂️ <span>Plano de Ação</span>
@@ -569,7 +569,7 @@ export const KanbanBoard = ({ tasks, saveTask, moveTaskStatus, moveTaskCamada, d
                         )}
                     </div>
                 ) : (
-                    <div className="flex gap-4 overflow-x-auto pb-2">
+                    <div className="flex flex-1 w-full overflow-x-auto min-h-[70vh] items-start gap-4 pb-4">
                         {KANBAN_STATUS.map(col => {
                             const colTasks = planoTasks.filter(t => t.status === col.id);
                             return (
