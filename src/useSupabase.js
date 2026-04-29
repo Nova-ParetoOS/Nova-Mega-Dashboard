@@ -533,7 +533,7 @@ export function useSupabaseData(userId) {
     const t = (v) => (v && String(v).trim() !== '') ? String(v).trim() : null;
     const row = {
       user_id: userId,
-      store_id: (form.store_id === 'all' || form.loja === 'all') ? '10' : String(form.store_id || form.loja || '10').replace(/\D/g, '') || '10',
+      store_id: (form.store_id === 'all' || form.loja === 'all') ? '10' : String(form.store_id || form.loja || '10').replace(/\D/g, '').replace(/^0+/, '') || '10',
       nome: form.nome,
       telefone: t(form.telefone),
       email: t(form.email),
@@ -657,7 +657,7 @@ export function useSupabaseData(userId) {
     const rawStore = f.store_id;
     const safeStore = (!rawStore || rawStore === 'all' || rawStore === 'Todas')
       ? '10'
-      : String(rawStore).replace(/\D/g, '') || '10';
+      : String(rawStore).replace(/\D/g, '').replace(/^0+/, '') || '10';
     const row = {
       user_id: userId,
       store_id: safeStore,

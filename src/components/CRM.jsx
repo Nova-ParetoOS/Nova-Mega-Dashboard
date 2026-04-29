@@ -569,7 +569,7 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
     const addOrder = async () => {
         if (!form.cliente.trim() || form.produto.length === 0) return;
         // store_id: usa o selecionado no form (Owner pode trocar); Gerente herda selectedStore
-        const targetStore = (userRole === 'owner' && form.store_id) ? form.store_id : selectedStore;
+        const targetStore = form.store_id || selectedStore;
         const savePayload = {
             ...form,
             produto: form.produto.join(', '),
@@ -579,10 +579,12 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
             store_id: targetStore,
             tipo_cliente: form.tipo_cliente || 'cliente'
         };
-        await saveCrmWishlist(savePayload, editId);
-        setForm({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', observacao: '', data: '1 mês', status: 'waiting', tipo_cliente: 'cliente', store_id: selectedStore });
-        setShowForm(false);
-        setEditId(null);
+        const success = await saveCrmWishlist(savePayload, editId);
+        if (success) {
+            setForm({ cliente: '', produto: [], modelo: [], tamanho: [], marca: [], wpp: '', observacao: '', data: '1 mês', status: 'waiting', tipo_cliente: 'cliente', store_id: selectedStore });
+            setShowForm(false);
+            setEditId(null);
+        }
     };
 
     const handleEditOrder = (o) => {
@@ -1004,7 +1006,7 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCr
         if (!form.nome?.trim()) return;
         // store_id: usa o selecionado no modal (Owner pode trocar); Gerente herda selectedStore
         const fallbackStore = selectedStore === 'all' ? '10' : String(selectedStore);
-        const targetStore = (userRole === 'owner' && form.store_id) ? form.store_id : fallbackStore;
+        const targetStore = form.store_id || fallbackStore;
         const savePayload = {
             ...(editLead || {}),
             ...form,
@@ -1016,9 +1018,11 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCr
             tamanho: form.tamanho.join(', '),
             tipo_cliente: form.tipo_cliente || 'cliente',
         };
-        await saveCrmLead(savePayload, editLead?.id || null);
-        setIsModalOpen(false);
-        setEditLead(null);
+        const success = await saveCrmLead(savePayload, editLead?.id || null);
+        if (success) {
+            setIsModalOpen(false);
+            setEditLead(null);
+        }
     };
 
     const leads = useMemo(() => {
