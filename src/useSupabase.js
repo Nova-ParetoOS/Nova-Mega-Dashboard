@@ -705,13 +705,13 @@ export function useSupabaseData(userId) {
     const rawStore = f.store_id;
     const safeStore = (!rawStore || rawStore === 'all' || rawStore === 'Todas')
       ? '10'
-      : String(rawStore).replace(/\D/g, '') || '10';
+      : String(rawStore).replace(/\D/g, '').replace(/^0+/, '') || '10';
 
     const row = {
       user_id: userId,
       store_id: safeStore,
       client_name: (f.cliente || f.client_name || '').trim() || null,
-      product_name: (f.produto || f.product || '').trim() || null,
+      product_name: (Array.isArray(f.produto) ? f.produto.join(', ') : (f.produto || f.product || '')).trim() || null,
       brand: Array.isArray(f.marca) ? f.marca.join(', ') : (f.marca || f.brand || null) || null,
       contact_info: (f.wpp || f.contato || f.contact || f.contact_info || '').trim() || null,
       priority: f.tipo_cliente || f.prioridade || f.priority || 'cliente',

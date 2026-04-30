@@ -567,7 +567,7 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
     };
 
     const addOrder = async () => {
-        if (!form.cliente.trim() || form.produto.length === 0) return;
+        if (!form.cliente?.trim() || form.produto.length === 0) return;
         // store_id: usa o selecionado no form (Owner pode trocar); Gerente herda selectedStore
         const targetStore = form.store_id || selectedStore;
         const savePayload = {
@@ -741,7 +741,7 @@ const EncomendasSection = ({ selectedStore, crmWishlist, saveCrmWishlist, delete
                                 ))}
                             </div>
                         </div>
-                        <button onClick={addOrder} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-2">
+                        <button onClick={addOrder} disabled={!form.cliente?.trim() || form.produto.length === 0} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-2">
                             {editId ? 'Salvar Alterações' : 'Salvar Pedido'} <ArrowRight className="w-4 h-4" />
                         </button>
                     </div>
@@ -993,7 +993,7 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCr
                 tamanho: lead.tamanho ? lead.tamanho.split(', ').filter(Boolean) : [],
                 tipo_cliente: lead.tipo_cliente || 'cliente',
                 // Preserva a loja original do lead na edição
-                store_id: lead.store_id || (selectedStore === 'all' ? '10' : String(selectedStore)),
+                store_id: String(lead.store_id || (selectedStore === 'all' ? '10' : selectedStore)),
             });
         } else {
             setEditLead(null);
@@ -1257,7 +1257,7 @@ const CRM = ({ crmLeads, saveCrmLead, moveCrmLeadStage, deleteCrmLead, archiveCr
                                     <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/40 to-transparent shrink-0">
                                         <h3 className="font-bold text-gray-800 flex items-center gap-2"><BookOpen className="w-4 h-4 text-indigo-500" /> Guia Rápido</h3>
                                     </div>
-                                    <div className="flex-1 overflow-hidden">
+                                    <div className="flex-1 overflow-y-auto">
                                         <PlaybookTab readOnly={true} />
                                     </div>
                                 </div>

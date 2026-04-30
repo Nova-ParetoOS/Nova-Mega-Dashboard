@@ -104,7 +104,11 @@ export const RH = ({
     const openCandidateForm = (candidate = null) => {
         if (candidate) {
             setEditId(candidate.id);
-            setForm({ ...candidate });
+            setForm({
+                ...candidate,
+                nome: candidate.nome || '',
+                store_id: String(candidate.store_id || candidate.loja || selectedStore).replace(/\D/g, '').replace(/^0+/, '') || '10'
+            });
         } else {
             setEditId(null);
             setForm({
